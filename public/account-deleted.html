@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrooklynAI - Account Deleted</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ff758c, #ff7eb3);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 40px;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+        .icon {
+            font-size: 64px;
+            color: #ff4d6d;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #ff4d6d;
+            margin-bottom: 15px;
+        }
+        p {
+            font-size: 16px;
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .btn {
+            background: #ff4d6d;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #e63946;
+        }
+        .btn.secondary {
+            background: #6c757d;
+        }
+        .btn.secondary:hover {
+            background: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🗑️</div>
+        <h1>Account Deleted</h1>
+        <p>
+            Your account has been deleted. If this was a mistake, please contact our support team to restore your account.
+        </p>
+        <button class="btn" onclick="contactSupport()">✉️ Contact Support</button>
+        <button class="btn secondary" onclick="goBack()">⬅️ Go Back</button>
+    </div>
+
+    <script>
+        function contactSupport() {
+            const subject = encodeURIComponent("Request to Restore Deleted Account");
+            const body = encodeURIComponent("Hello,\n\nI would like to request restoration of my deleted BrooklynAI account.\n\nUser Email: [Your Email Here]\n\nThank you!");
+            window.location.href = `mailto:support@brooklynai.local?subject=${subject}&body=${body}`;
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+    </script>
+</body>
+</html>

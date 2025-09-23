@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrooklynAI - Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 40px;
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+        }
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #f0f0f0;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #5a5a5a;
+            margin-bottom: 5px;
+        }
+        .email {
+            font-size: 16px;
+            color: #777;
+            margin-bottom: 30px;
+        }
+        .token-box {
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: left;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+            margin: 20px 0;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .btn {
+            background: #6e8efb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #5a7df7;
+        }
+        .btn.danger {
+            background: #e74c3c;
+        }
+        .btn.danger:hover {
+            background: #c0392b;
+        }
+        .btn.warning {
+            background: #f39c12;
+        }
+        .btn.warning:hover {
+            background: #e67e22;
+        }
+        .section-title {
+            text-align: left;
+            margin-top: 30px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #eee;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img id="avatar" class="avatar" src="https://via.placeholder.com/120" alt="User Avatar">
+        <h1 id="name">Loading...</h1>
+        <p class="email" id="email">-</p>
+        <p class="access" id="access">-</p>
+
+        <div class="section-title">🔐 Your Access Token</div>
+        <div class="token-box" id="token">Loading token...</div>
+
+        <button class="btn" onclick="copyToken()">📋 Copy Token</button>
+        <button class="btn danger" onclick="logout()">🚪 Logout</button>
+        <button class="btn warning" onclick="deactivateAccount()">⏸️ Deactivate Account</button>
+    </div>
+
+    <script>
+        // Get URL parameters (from Laravel callback redirect)
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+            const user = JSON.parse(decodeURIComponent(params.get('user') || '{}'));
+            const acs = params.get('acs');
+            return { token, user, acs};
+        }
+
+        // Display data
+        function displayData() {
+            const { token, user, acs } = getUrlParams();
+            if (!token || !user) {
+                document.getElementById('name').innerText = 'Error: No data received';
+                return;
+            }
+
+            document.getElementById('name').innerText = user.name || 'Unknown User';
+            document.getElementById('email').innerText = user.email || '';
+            if(acs == 1) {
+                document.getElementById('access').innerText = "has access";
+            } else {
+                document.getElementById('access').innerText = "doesn't have access";
+            }
+            document.getElementById('token').innerText = token;
+
+            if (user.avatar) {
+                document.getElementById('avatar').src = user.avatar;
+            }
+        }
+
+        // Copy token to clipboard
+        function copyToken() {
+            const token = document.getElementById('token').innerText;
+            navigator.clipboard.writeText(token).then(() => {
+                alert('Token copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                alert('Failed to copy token. Please select and copy manually.');
+            });
+        }
+
+        // Logout function
+        function logout() {
+            const token = document.getElementById('token').innerText;
+
+            if (!token) {
+                alert('No token found. Redirecting to login...');
+                window.location.href = 'http://localhost:8000/login.html';
+                return;
+            }
+
+            fetch('http://localhost:8000/api/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert(data.message);
+                window.location.href = 'http://localhost:8000/login.html';
+            })
+            .catch(err => {
+                console.error('Logout failed:', err);
+                alert('Logout failed. Please try again or close this page.');
+            });
+        }
+
+        // Deactivate account function
+        function deactivateAccount() {
+            if (!confirm('Are you sure you want to deactivate your account? You can contact support to restore it later.')) {
+                return;
+            }
+
+            const token = document.getElementById('token').innerText;
+
+            if (!token) {
+                alert('No token found. Please login again.');
+                window.location.href = 'http://localhost:8000/login.html';
+                return;
+            }
+
+            const reason = prompt('Please tell us why you’re deactivating (optional):');
+
+            fetch('http://localhost:8000/api/account/deactivate', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ reason: reason })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert(data.message);
+                window.location.href = 'http://localhost:8000/login.html';
+            })
+            .catch(err => {
+                console.error('Deactivate account failed:', err);
+                alert('Failed to deactivate account. Please try again.');
+            });
+        }
+
+        // Run on load
+        window.onload = displayData;
+    </script>
+</body>
+</html>
