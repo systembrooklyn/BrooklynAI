@@ -29,7 +29,7 @@ class GoogleAuthController extends Controller
     {
         try {
 
-            $googleUser = Socialite::driver('google')->stateless()->user();
+            $googleUser = Socialite::driver('google')->user();
             // $googleUser = Socialite::driver('google')->user(); 
 
 
@@ -71,12 +71,12 @@ class GoogleAuthController extends Controller
             // //     'acs'     => $acs,
             // ]);
         } catch (\Exception $e) {
-    Log::error('Google Login Error: ' . $e->getMessage(), [
-        'trace' => $e->getTraceAsString(),
-        'request' => $request->all(),
-    ]);
     return response()->json([
-        'error' => 'Could not process login. Please try again.'
+        'error' => 'Login failed',
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+        'trace' => $e->getTraceAsString(),
     ], 500);
 }}
     /**
