@@ -131,11 +131,11 @@ class GoogleAuthController extends Controller
 
 
 
-catch (\Exception $e) {
-    Log::error('Google Login Error: ' . $e->getMessage(), [
-        'trace' => $e->getTraceAsString(),
-        'request' => $request->all(),
-    ]);
-    return response()->json([
-        'error' => 'Could not process login. Please try again.'
-    ], 500);
+// catch (\Exception $e) {
+//     Log::error('Google Login Error: ' . $e->getMessage(), [
+//         'trace' => $e->getTraceAsString(),
+//         'request' => $request->all(),
+//     ]);
+//     return response()->json([
+//         'error' => 'Could not process login. Please try again.'
+//     ], 500);
