@@ -59,14 +59,15 @@ class GoogleAuthController extends Controller
 
             $token = $user->createToken('authToken')->plainTextToken;
             // Redirect to HTML page with token & user data as query params
-            return redirect()->away(url('/callback.html?token=' . urlencode($token) . '&acs=' . $acs . '&user=' . urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
+            // return redirect()->away(url('https://brooklyn-ai.onrender.com/business-instructor?token=' . urlencode($token) . '&acs=' . $acs . '&user=' . urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
 
 
-            // return response()->json([
-            //     'message' => 'Login successful',
-            //     'token'   => $token,
-            //     'user'    => $user
-            // ]);
+            return response()->json([
+                'message' => 'Login successful',
+                'token'   => $token,
+                'user'    => $user,
+                'acs'     => $acs,
+            ]);
 
 
         } catch (\Exception $e) {
