@@ -17,8 +17,8 @@ class GoogleAuthController extends Controller
      */
     public function redirect()
     {
-        // return Socialite::driver('google')->stateless()->redirect();
-        return Socialite::driver('google')->redirect();
+        return Socialite::driver('google')->stateless()->redirect();
+        // return Socialite::driver('google')->redirect();
     }
 
 
@@ -29,8 +29,8 @@ class GoogleAuthController extends Controller
     {
         try {
 
-            // $googleUser = Socialite::driver('google')->stateless()->user();
-            $googleUser = Socialite::driver('google')->user(); 
+            $googleUser = Socialite::driver('google')->stateless()->user();
+            // $googleUser = Socialite::driver('google')->user(); 
 
 
             $user = User::withTrashed()->where('google_id', $googleUser->id)->first();
