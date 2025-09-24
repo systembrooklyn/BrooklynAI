@@ -57,11 +57,11 @@ class GoogleAuthController extends Controller
                 ]);
             }
             $acs = $user->has_bot_access;
-            
+
 
             $token = $user->createToken('authToken')->plainTextToken;
             // Redirect to HTML page with token & user data as query params
-             return redirect()->away(url('https://www.aibrooklyn.net/business-instructor?token=' . urlencode($token) . '&acs=' . $acs . '&user=' . urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
+            return redirect()->away(url('https://www.aibrooklyn.net/business-instructor?token=' . urlencode($token) . '&acs=' . $acs . '&user=' . urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
 
 
             // // return response()->json([
@@ -70,15 +70,22 @@ class GoogleAuthController extends Controller
             // //     'user'    => $user,
             // //     'acs'     => $acs,
             // ]);
+
         } catch (\Exception $e) {
-    return response()->json([
-        'error' => 'Login failed',
-        'message' => $e->getMessage(),
-        'file' => $e->getFile(),
-        'line' => $e->getLine(),
-        'trace' => $e->getTraceAsString(),
-    ], 500);
-}}
+            Log::error('Google Login Error: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Could not process login. Please try again.'
+            ], 500);
+        }
+    }
+    // catch (\Exception $e) {
+    // return response()->json([
+    //     'error' => 'Login failed',
+    //     'message' => $e->getMessage(),
+    //     'file' => $e->getFile(),
+    //     'line' => $e->getLine(),
+    //     'trace' => $e->getTraceAsString(),
+    // ], 500);
     /**
      * Log the user out (Revoke the token).
      */
