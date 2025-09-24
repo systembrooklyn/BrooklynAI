@@ -55,7 +55,7 @@ class GoogleAuthController extends Controller
                 ]);
             }
             $acs = $user->has_bot_access;
-
+            echo $user;
 
             $token = $user->createToken('authToken')->plainTextToken;
             // Redirect to HTML page with token & user data as query params
@@ -68,8 +68,6 @@ class GoogleAuthController extends Controller
                 'user'    => $user,
                 'acs'     => $acs,
             ]);
-
-
         } catch (\Exception $e) {
             Log::error('Google Login Error: ' . $e->getMessage());
             return response()->json([
