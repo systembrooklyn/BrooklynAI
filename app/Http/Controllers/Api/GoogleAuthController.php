@@ -55,7 +55,7 @@ class GoogleAuthController extends Controller
                 ]);
             }
             $acs = $user->has_bot_access;
-            echo $user;
+            
 
             $token = $user->createToken('authToken')->plainTextToken;
             // Redirect to HTML page with token & user data as query params
