@@ -59,15 +59,15 @@ class GoogleAuthController extends Controller
 
             $token = $user->createToken('authToken')->plainTextToken;
             // Redirect to HTML page with token & user data as query params
-            // return redirect()->away(url('https://brooklyn-ai.onrender.com/business-instructor?token=' . urlencode($token) . '&acs=' . $acs . '&user=' . urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
+             return redirect()->away(url('https://www.aibrooklyn.net/business-instructor?token=' . urlencode($token) . '&acs=' . $acs . '&user=' . urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
 
 
-            return response()->json([
-                'message' => 'Login successful',
-                'token'   => $token,
-                'user'    => $user,
-                'acs'     => $acs,
-            ]);
+            // // return response()->json([
+            // //     'message' => 'Login successful',
+            // //     'token'   => $token,
+            // //     'user'    => $user,
+            // //     'acs'     => $acs,
+            // ]);
         } catch (\Exception $e) {
     Log::error('Google Login Error: ' . $e->getMessage(), [
         'trace' => $e->getTraceAsString(),
