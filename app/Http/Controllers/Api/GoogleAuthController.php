@@ -86,6 +86,9 @@ class GoogleAuthController extends Controller
     //     'line' => $e->getLine(),
     //     'trace' => $e->getTraceAsString(),
     // ], 500);
+
+
+
     /**
      * Log the user out (Revoke the token).
      */
