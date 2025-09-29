@@ -11,14 +11,30 @@ use Illuminate\Support\Str;
 
 class GoogleAuthController extends Controller
 {
-
     /**
-     * Redirect the user to the Google authentication page.
+     * Redirect for general Google authentication (login only).
      */
     public function redirect()
     {
-        return Socialite::driver('google')->stateless()->redirect();
-        // return Socialite::driver('google')->redirect();
+        return Socialite::driver('google')
+            ->stateless()->redirect();
+    }
+
+    /**
+     * Redirect for Google authentication with Gmail send permission.
+     */
+    public function redirectGmail()
+    { {
+            return Socialite::driver('google')
+                ->stateless()
+                ->with(['access_type' => 'offline', 'prompt' => 'consent'])
+                ->scopes([
+                    'email',
+                    'profile',
+                    'https://www.googleapis.com/auth/gmail.send'
+                ])
+                ->redirect();
+        }
     }
 
 
@@ -51,40 +67,61 @@ class GoogleAuthController extends Controller
                     'name'      => $googleUser->name,
                     'email'     => $googleUser->email,
                     'google_id' => $googleUser->id,
-                    'avatar' => $googleUser->avatar ?? null,
-                    'password'  => bcrypt(str::random(12)), // random password "password col isn't nullable"
+                    'avatar'    => $googleUser->avatar ?? null,
+                    'password'  => bcrypt(Str::random(12)),
                     'has_bot_access' => false,
+                    // ADDED: Store Google tokens for Gmail API
+                    'google_access_token' => $googleUser->token,
+                    'google_refresh_token' => $googleUser->refreshToken,
+                    'google_token_expires_at' => now()->addSeconds($googleUser->expiresIn),
+                ]);
+            } else {
+                //  ADDED: Update tokens for existing users
+                $user->update([
+                    'google_access_token' => $googleUser->token,
+                    'google_refresh_token' => $googleUser->refreshToken ?? $user->google_refresh_token,
+                    'google_token_expires_at' => now()->addSeconds($googleUser->expiresIn),
                 ]);
             }
             $acs = $user->has_bot_access;
-
-
             $token = $user->createToken('authToken')->plainTextToken;
+            $session = session()->getId();
+
+            Log::info('Debug Token & Session', [
+                'token' => $token,
+                'session_id' => $session,
+                'user_id' => $user->id,
+                'email' => $user->email,
+            ]);
             // Redirect to HTML page with token & user data as query params
-            return redirect()->away(url('https://www.aibrooklyn.net/business-instructor?token=' . urlencode($token) . '&acs=' . $acs . '&user=' . urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
+            return redirect()->away(url('https://www.aibrooklyn.net/business-instructor?token=' . urlencode($token)
+                . '&acs=' . $acs . '&user=' .
+                urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
 
 
-            // // return response()->json([
-            // //     'message' => 'Login successful',
-            // //     'token'   => $token,
-            // //     'user'    => $user,
-            // //     'acs'     => $acs,
+
+
+            // return response()->json([
+            //     // 'message' => 'Login successful',
+            //     'session' => $session,
+            //     'token'   => $token,
+            //     // 'user'    => $user,
+            //     // 'acs'     => $acs,
             // ]);
 
         } catch (\Exception $e) {
             Log::error('Google Login Error: ' . $e->getMessage());
             return response()->json([
-                'error' => 'Could not process login. Please try again.'
+                'error' => 'Login failed',
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ], 500);
         }
     }
     // catch (\Exception $e) {
     // return response()->json([
-    //     'error' => 'Login failed',
-    //     'message' => $e->getMessage(),
-    //     'file' => $e->getFile(),
-    //     'line' => $e->getLine(),
-    //     'trace' => $e->getTraceAsString(),
+    //     'error' => 'Could not process login. Please try again.'
     // ], 500);
 
 
