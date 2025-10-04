@@ -43,8 +43,12 @@ class GCalenderEventResource extends JsonResource
                 'dateTime' => $this->formatGoogleDateTime($end->getDateTime()),
                 'timeZone' => $end->getTimeZone(),
             ] : null,
+
             'attendees' => collect($this->getAttendees() ?? [])
-                ->map(fn($a) => ['email' => $a->getEmail()])
+                ->map(fn($a) => [
+                    'email' => $a->getEmail(),
+                    'status' => $this->mapResponseStatus($a->getResponseStatus())
+                ])
                 ->values()
                 ->toArray(),
             'htmlLink' => $this->getHtmlLink() ?? null,
@@ -52,5 +56,16 @@ class GCalenderEventResource extends JsonResource
             'created' => $this->getCreated() ?? null,
             'updated' => $this->getUpdated() ?? null,
         ];
+    }
+    
+    private function mapResponseStatus($status)
+    {
+        return match ($status) {
+            'accepted' => 'accepted',
+            'declined' => 'rejected',
+            'tentative' => 'maybe',
+            'needsAction' => 'pending',
+            default => 'unknown',
+        };
     }
 }
