@@ -31,7 +31,11 @@ class GoogleAuthController extends Controller
                 ->scopes([
                     'email',
                     'profile',
-                    'https://www.googleapis.com/auth/gmail.send'
+                    // ADD THESE SCOPES FOR GMAIL SEND
+                    'https://www.googleapis.com/auth/gmail.send',
+                    // ADD THESE CALENDAR SCOPES
+                    'https://www.googleapis.com/auth/calendar.events', // Create/edit events
+                    'https://www.googleapis.com/auth/calendar.readonly', // Read-only access
                 ])
                 ->redirect();
         }
@@ -84,7 +88,16 @@ class GoogleAuthController extends Controller
                 ]);
             }
             $acs = $user->has_bot_access;
-            $token = $user->createToken('authToken')->plainTextToken;
+
+            $expiresIn = $googleUser->expiresIn;
+            Log::info('Token expiration data:', [
+                'google_token_expires_at' => $user->google_token_expires_at,
+                'type' => gettype($user->google_token_expires_at),
+                'timestamp_value' => strtotime($user->google_token_expires_at),
+                'current_time' => time(),
+                'calculated_expires_in' => $expiresIn
+            ]);
+            $token = $user->createToken($user->name)->plainTextToken;
             $session = session()->getId();
 
             Log::info('Debug Token & Session', [

@@ -29,7 +29,7 @@ class GmailService
         $this->client->setAccessType('offline');
         $this->client->setApprovalPrompt('force');
 
-        // ✅ NO EXTRA SPACES IN SCOPE!
+        
         $this->client->addScope('https://www.googleapis.com/auth/gmail.send');
 
         // Calculate expiration

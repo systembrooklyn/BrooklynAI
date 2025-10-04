@@ -9,42 +9,43 @@ use Illuminate\Support\Facades\Log;
 
 class EmailController extends Controller
 {
-    public function sendTestEmail(Request $request)
+    public function sendEmail(Request $request)
     {
-       $request->validate([
-        'to' => 'required|email',
-        'subject' => 'required|string|max:255',
-        'body' => 'required|string',
-    ]);
-
-    $user = $request->user();
-
-    try {
-        $gmail = new GmailService($user);
-        $gmail->sendEmail(
-            to: $request->to,
-            subject: $request->subject,
-            htmlBody: $request->body
-        );
-
-        return response()->json(['message' => 'Email sent successfully!']);
-    } catch (\Exception $e) {
-        Log::error('GmailService Error', [
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-            'trace' => $e->getTraceAsString(),
-            'user_id' => $user?->id,
-            'email' => $user?->email,
+        $request->validate([
+            'to' => 'required|email',
+            'subject' => 'required|string|max:255',
+            'body' => 'required|string',
         ]);
 
-        // 🚨 Return full error during dev
-        return response()->json([
-            'error' => 'Email send failed',
-            'details' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine()
-        ], 500);
+        $user = $request->user();
+
+        try {
+            $gmail = new GmailService($user);
+            $gmail->sendEmail(
+                to: $request->to,
+                subject: $request->subject,
+                htmlBody: $request->body
+            );
+
+            return response()->json(['message' => 'Email sent successfully!']);
+        } catch (\Exception $e) {
+            Log::error('GmailService Error', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $user?->id,
+                'email' => $user?->email,
+            ]);
+
+            //  Return full error during dev
+            return response()->json([
+                'error' => 'Email send failed',
+                'details' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
+        }
     }
-}
+    
 }
