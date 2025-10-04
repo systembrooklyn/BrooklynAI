@@ -31,11 +31,15 @@ class GoogleAuthController extends Controller
                 ->scopes([
                     'email',
                     'profile',
-                    // ADD THESE SCOPES FOR GMAIL SEND
+                    // THIS SCOPES FOR GMAIL SEND
                     'https://www.googleapis.com/auth/gmail.send',
-                    // ADD THESE CALENDAR SCOPES
+                    //  GOOGLE CALENDAR SCOPES
                     'https://www.googleapis.com/auth/calendar.events', // Create/edit events
-                    'https://www.googleapis.com/auth/calendar.readonly', // Read-only access
+                    'https://www.googleapis.com/auth/calendar.readonly',
+                    //  THIS GOOGLE SHEETS SCOPE
+                    'https:www.googleapis.com/auth/spreadsheets',
+                    // THIS GOOGLE DRIVE SCOPE
+                    'https://www.googleapis.com/auth/drive'
                 ])
                 ->redirect();
         }
