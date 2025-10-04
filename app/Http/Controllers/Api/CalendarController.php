@@ -140,6 +140,7 @@ class CalendarController extends Controller
             // ->filter(fn($e) => !empty($e['summary']))->values(); // Optional filter
 
             return response()->json([
+                'message' => 'Event Retreived successfully',
                 'data' => GCalenderEventResource::collection($eventList->getItems()),
                 'count' => $eventList->count()
             ]);
