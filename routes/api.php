@@ -6,10 +6,11 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\EmailController as ApiEmailController;
 use App\Http\Controllers\Api\CalendarController;
+use App\Http\Controllers\Api\GoogleSheetsController;
+
 
 use App\Http\Controllers\Api\TestLoginController;
 
-// ONLY FOR DEVELOPMENT - REMOVE IN PRODUCTION
 
 
 
@@ -36,4 +37,27 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/calendar/events/{eventId}', [CalendarController::class, 'getEvent']);
     Route::put('/calendar/events/{eventId}', [CalendarController::class, 'updateEvent']);
     Route::delete('/calendar/events/{eventId}', [CalendarController::class, 'deleteEvent']);
+});
+
+
+
+// ONLY ONE GROUP - NO DUPLICATES
+Route::middleware('auth:sanctum')->group(function () {
+    // List all spreadsheets from Drive
+    Route::get('/google-sheets', [GoogleSheetsController::class, 'listAll']);
+
+    //func to add new sperad sheet
+    //func to get id sheet inside the spread sheet 
+    // CRUD on a specific spreadsheet
+    Route::get('/google-sheets/{id}', [GoogleSheetsController::class, 'show']);
+    Route::post('/google-sheets/{id}', [GoogleSheetsController::class, 'addSheet']);
+    Route::delete('/google-sheets/{id}', [GoogleSheetsController::class, 'deleteSheet']);
+
+    // Data operations
+    Route::get('/google-sheets/{id}/data', [GoogleSheetsController::class, 'getData']);
+    Route::put('/google-sheets/{id}/data', [GoogleSheetsController::class, 'updateData']);
+    Route::post('/google-sheets/{id}/data', [GoogleSheetsController::class, 'appendData']);
+    Route::delete('/google-sheets/{id}/data', [GoogleSheetsController::class, 'clearData']);
+
+    Route::post('/google-sheets/{spreadsheetId}/append-under-header',  [GoogleSheetsController::class, 'appendUnderHeader']);
 });

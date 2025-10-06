@@ -37,9 +37,12 @@ class GoogleAuthController extends Controller
                     'https://www.googleapis.com/auth/calendar.events', // Create/edit events
                     'https://www.googleapis.com/auth/calendar.readonly',
                     //  THIS GOOGLE SHEETS SCOPE
-                    'https:www.googleapis.com/auth/spreadsheets',
+                    
+                    'https://www.googleapis.com/auth/spreadsheets', // Full Sheets access
                     // THIS GOOGLE DRIVE SCOPE
-                    'https://www.googleapis.com/auth/drive'
+                    'https://www.googleapis.com/auth/drive',
+                    'https://www.googleapis.com/auth/drive.readonly',
+                    'https://www.googleapis.com/auth/drive' // Full Drive access (needed for Sheets)
                 ])
                 ->redirect();
         }
