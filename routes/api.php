@@ -14,17 +14,17 @@ use App\Http\Controllers\Api\TestLoginController;
 
 
 
+Route::post('/register',[UserController::class,'register']);
 
 
 // Public routes (no auth required)
 Route::get('/user', function (Request $request) {
     return response()->json([
         'message' => 'User Retrieved successfully',
-        'data' => $request->user()->only(['id', 'name','avater','email', 'has_bot_access', 'access_expiry'])
+        'data' => $request->user()->only(['id', 'name','avatar','email', 'has_bot_access', 'access_expiry'])
     ]);
 })->middleware('auth:sanctum');
 
-Route::post('/register',[UserController::class,'register']);
 
 // Google Auth Routes (some public, some protected)
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
