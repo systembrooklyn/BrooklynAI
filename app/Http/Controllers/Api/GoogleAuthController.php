@@ -37,7 +37,7 @@ class GoogleAuthController extends Controller
                     'https://www.googleapis.com/auth/calendar.events', // Create/edit events
                     'https://www.googleapis.com/auth/calendar.readonly',
                     //  THIS GOOGLE SHEETS SCOPE
-                    
+
                     'https://www.googleapis.com/auth/spreadsheets', // Full Sheets access
                     // THIS GOOGLE DRIVE SCOPE
                     'https://www.googleapis.com/auth/drive',
@@ -58,37 +58,35 @@ class GoogleAuthController extends Controller
 
             $googleUser = Socialite::driver('google')->stateless()->user();
             // $googleUser = Socialite::driver('google')->user(); 
-
-
-            $user = User::withTrashed()->where('google_id', $googleUser->id)->first();
-
+            // $user = User::withTrashed()->where('google_id', $googleUser->id)->first();
+            $user = User::withTrashed()->where('email', $googleUser->email)->first();
             // If user exists but is soft-deleted
             if ($user && $user->trashed()) {
                 return redirect()->away(url('/account-deleted.html'));
-
-
                 // return response()->json([
                 //     'error' => 'Account is deleted. Please contact support to restore.'
                 // ], 403);
-
             }
-
-            if (!$user) {
-                $user = User::create([
-                    'name'      => $googleUser->name,
-                    'email'     => $googleUser->email,
-                    'google_id' => $googleUser->id,
-                    'avatar'    => $googleUser->avatar ?? null,
-                    'password'  => bcrypt(Str::random(12)),
-                    'has_bot_access' => false,
-                    // ADDED: Store Google tokens for Gmail API
-                    'google_access_token' => $googleUser->token,
-                    'google_refresh_token' => $googleUser->refreshToken,
-                    'google_token_expires_at' => now()->addSeconds($googleUser->expiresIn),
-                ]);
+            if (!$user || !$user->has_bot_access) {
+                return redirect()->away(url('https://www.aibrooklyn.net/models?token=null'));
+                // $user = User::create([
+                //     'name'      => $googleUser->name,
+                //     'email'     => $googleUser->email,
+                //     'google_id' => $googleUser->id,
+                //     'avatar'    => $googleUser->avatar ?? null,
+                //     'password'  => bcrypt(Str::random(12)),
+                //     'has_bot_access' => false,
+                //     // ADDED: Store Google tokens for Gmail API
+                //     'google_access_token' => $googleUser->token,
+                //     'google_refresh_token' => $googleUser->refreshToken,
+                //     'google_token_expires_at' => now()->addSeconds($googleUser->expiresIn),
+                // ]);
             } else {
                 //  ADDED: Update tokens for existing users
                 $user->update([
+                    'name'      => $googleUser->name,
+                    'google_id' => $googleUser->id,
+                    'avatar'    => $googleUser->avatar ?? null,
                     'google_access_token' => $googleUser->token,
                     'google_refresh_token' => $googleUser->refreshToken ?? $user->google_refresh_token,
                     'google_token_expires_at' => now()->addSeconds($googleUser->expiresIn),
@@ -97,22 +95,22 @@ class GoogleAuthController extends Controller
             $acs = $user->has_bot_access;
 
             $expiresIn = $googleUser->expiresIn;
-            Log::info('Token expiration data:', [
-                'google_token_expires_at' => $user->google_token_expires_at,
-                'type' => gettype($user->google_token_expires_at),
-                'timestamp_value' => strtotime($user->google_token_expires_at),
-                'current_time' => time(),
-                'calculated_expires_in' => $expiresIn
-            ]);
+            // Log::info('Token expiration data:', [
+            //     'google_token_expires_at' => $user->google_token_expires_at,
+            //     'type' => gettype($user->google_token_expires_at),
+            //     'timestamp_value' => strtotime($user->google_token_expires_at),
+            //     'current_time' => time(),
+            //     'calculated_expires_in' => $expiresIn
+            // ]);
             $token = $user->createToken($user->name)->plainTextToken;
             $session = session()->getId();
 
-            Log::info('Debug Token & Session', [
-                'token' => $token,
-                'session_id' => $session,
-                'user_id' => $user->id,
-                'email' => $user->email,
-            ]);
+            // Log::info('Debug Token & Session', [
+            //     'token' => $token,
+            //     'session_id' => $session,
+            //     'user_id' => $user->id,
+            //     'email' => $user->email,
+            // ]);
             // Redirect to HTML page with token & user data as query params
             return redirect()->away(url('https://www.aibrooklyn.net/models?token=' . urlencode($token)
                 . '&acs=' . $acs . '&user=' .
@@ -130,7 +128,7 @@ class GoogleAuthController extends Controller
             // ]);
 
         } catch (\Exception $e) {
-            Log::error('Google Login Error: ' . $e->getMessage());
+            // Log::error('Google Login Error: ' . $e->getMessage());
             return response()->json([
                 'error' => 'Login failed',
                 'message' => $e->getMessage(),
@@ -152,7 +150,7 @@ class GoogleAuthController extends Controller
     public function logout(Request $request)
     {
         // Revoke the current token
-        $request->user()->currentAccessToken()->delete();
+        $request->user()->tokens()->delete();
 
         return response()->json([
             'message' => 'Successfully logged out.'

@@ -27,9 +27,11 @@ class User extends Authenticatable
         'google_id',
         'avatar',
         'has_bot_access',
+        'access_expiry',
         'google_access_token',
         'google_refresh_token',
         'google_token_expires_at',
+
     ];
 
     /**
@@ -40,6 +42,15 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'google_access_token',
+        'google_refresh_token',
+        'google_token_expires_at',
+        'created_at',
+        'updated_at',
+        'email_verified_at',
+        'deleted_at',
+        'deactivation_reason',
+        'google_id'
     ];
 
     /**
@@ -51,5 +62,6 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password'          => 'hashed',
         'deleted_at'        => 'datetime',
+        
     ];
 }

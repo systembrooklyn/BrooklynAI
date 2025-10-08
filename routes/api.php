@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\EmailController as ApiEmailController;
 use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\GoogleSheetsController;
+use App\Http\Controllers\Api\UserController;
 
 
 use App\Http\Controllers\Api\TestLoginController;
@@ -17,8 +18,13 @@ use App\Http\Controllers\Api\TestLoginController;
 
 // Public routes (no auth required)
 Route::get('/user', function (Request $request) {
-    return $request->user();
+    return response()->json([
+        'message' => 'User Retrieved successfully',
+        'data' => $request->user()->only(['id', 'name','avater','email', 'has_bot_access', 'access_expiry'])
+    ]);
 })->middleware('auth:sanctum');
+
+Route::post('/register',[UserController::class,'register']);
 
 // Google Auth Routes (some public, some protected)
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
