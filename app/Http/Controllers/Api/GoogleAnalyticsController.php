@@ -65,4 +65,14 @@ class GoogleAnalyticsController extends Controller
             'data' => $data,
         ]);
     }
+
+    public function getTopPagesByViews(Request $request, string $propertyId)
+    {
+        $service = new GoogleAnalyticsService($request->user());
+        $data = $service->getTopPagesByViews($propertyId, 10); // Top 10 pages
+        return response()->json([
+            'message' => 'Views by page title retrieved successfully.',
+            'data' => $data,
+        ]);
+    }
 }

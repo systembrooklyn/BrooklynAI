@@ -7,6 +7,8 @@ use Google\Service\AnalyticsData;
 use Google\Service\AnalyticsData\DateRange;
 use Google\Service\AnalyticsData\Dimension;
 use Google\Service\AnalyticsData\Metric;
+use Google\Service\AnalyticsData\MetricOrderBy;
+use Google\Service\AnalyticsData\OrderBy;
 use Google\Service\AnalyticsData\RunRealtimeReportRequest;
 use Google\Service\AnalyticsData\RunReportRequest;
 use Illuminate\Support\Facades\Log;
@@ -225,18 +227,19 @@ class GoogleAnalyticsService
     }
 
 
-    public function getHomeScreenMetrics(string $propertyId, 
-    string $startDate = '30daysAgo',
-        string $endDate = 'today')
-    {
+    public function getHomeScreenMetrics(
+        string $propertyId,
+        string $startDate = '30daysAgo',
+        string $endDate = 'today'
+    ) {
         try {
-            
-            $startDate=
+
+
             $dateRange = new DateRange([
                 'startDate' => $startDate,
                 'endDate' => $endDate,
             ]);
-            
+
 
             // === 2. Get Event Count, Views, New Users (Today) ===
 
@@ -277,6 +280,62 @@ class GoogleAnalyticsService
             ];
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('GA4 Home Screen Metrics Error: ' . $e->getMessage(), [
+                'user_id' => $this->user->id,
+                'property_id' => $propertyId,
+            ]);
+            throw $e;
+        }
+    }
+    public function getTopPagesByViews(string $propertyId, int $limit = 10)
+    {
+        try {
+            $request = new RunReportRequest([
+                'dimensions' => [
+                    new Dimension(['name' => 'unifiedScreenName']),
+                ],
+                'metrics' => [
+                    new Metric(['name' => 'screenPageViews']),
+                ],
+                'dateRanges' => [
+                    new DateRange([
+                        'startDate' => 'today',
+                        'endDate' => 'today',
+                    ])
+                ],
+                'orderBys' => [
+                    new OrderBy([
+                        'metric' => new MetricOrderBy([
+                            'metricName' => 'screenPageViews'
+                        ]),
+                        'desc' => true,
+                    ])
+                ],
+                'limit' => $limit,
+            ]);
+
+            $response = $this->service->properties->runReport("properties/{$propertyId}", $request);
+
+            $rows = [];
+            foreach ($response->getRows() as $row) {
+                $pageTitle = $row->getDimensionValues()[0]->getValue();
+                $views = (int) $row->getMetricValues()[0]->getValue();
+
+                // Skip "(not set)" if needed
+                if ($pageTitle === '(not set)') continue;
+
+                $rows[] = [
+                    'pageTitle' => $pageTitle,
+                    'views' => $views,
+                ];
+            }
+
+            return [
+                'lastUpdated' => now()->toIso8601String(),
+                'timeRange' => 'today',
+                'pages' => $rows,
+            ];
+        } catch (\Exception $e) {
+            Log::error('GA4 Top Pages Error: ' . $e->getMessage(), [
                 'user_id' => $this->user->id,
                 'property_id' => $propertyId,
             ]);
