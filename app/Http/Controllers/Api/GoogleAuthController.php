@@ -23,7 +23,7 @@ class GoogleAuthController extends Controller
     /**
      * Redirect for Google authentication with Gmail send permission.
      */
-    public function redirectGmail()
+    public function redirectgoogle()
     { {
             return Socialite::driver('google')
                 ->stateless()
@@ -31,18 +31,19 @@ class GoogleAuthController extends Controller
                 ->scopes([
                     'email',
                     'profile',
-                    // THIS SCOPES FOR GMAIL SEND
+                    //  SCOPES FOR GMAIL SEND
                     'https://www.googleapis.com/auth/gmail.send',
                     //  GOOGLE CALENDAR SCOPES
                     'https://www.googleapis.com/auth/calendar.events', // Create/edit events
                     'https://www.googleapis.com/auth/calendar.readonly',
-                    //  THIS GOOGLE SHEETS SCOPE
-
+                    //   GOOGLE SHEETS SCOPE
                     'https://www.googleapis.com/auth/spreadsheets', // Full Sheets access
-                    // THIS GOOGLE DRIVE SCOPE
+                    //  GOOGLE DRIVE SCOPE
                     'https://www.googleapis.com/auth/drive',
                     'https://www.googleapis.com/auth/drive.readonly',
-                    'https://www.googleapis.com/auth/drive' // Full Drive access (needed for Sheets)
+                    'https://www.googleapis.com/auth/drive' ,// Full Drive access (needed for Sheets)
+                    //  GOOGLE ANALYTICS SCOPE
+                    "https://www.googleapis.com/auth/analytics.readonly"
                 ])
                 ->redirect();
         }
@@ -68,7 +69,7 @@ class GoogleAuthController extends Controller
                 // ], 403);
             }
             if (!$user || !$user->has_bot_access) {
-                return redirect()->away(url('https://www.aibrooklyn.net/models?token=null'));
+                return redirect()->away(url('https://www.aibrooklyn.net?token=null'));
                 // $user = User::create([
                 //     'name'      => $googleUser->name,
                 //     'email'     => $googleUser->email,
@@ -112,7 +113,7 @@ class GoogleAuthController extends Controller
             //     'email' => $user->email,
             // ]);
             // Redirect to HTML page with token & user data as query params
-            return redirect()->away(url('https://www.aibrooklyn.net/models?token=' . urlencode($token)
+            return redirect()->away(url('https://www.aibrooklyn.net?token=' . urlencode($token)
                 . '&acs=' . $acs . '&user=' .
                 urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
 

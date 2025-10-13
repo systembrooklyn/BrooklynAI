@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-// ✅ Correct use statements for google/apiclient v2.18+
+//
 use Google\Client as Google_Client;
 use Google\Service\Gmail as Google_Service_Gmail;
 use Google\Service\Gmail\Message as Google_Service_Gmail_Message;
@@ -46,7 +46,7 @@ class GmailService
         if ($this->client->isAccessTokenExpired()) {
             if (!$user->google_refresh_token) {
                 Log::error('No refresh token available', ['user_id' => $user->id]);
-                throw new \Exception('Token expired and no refresh token. Re-login required.');
+                throw new \Exception('No refresh token available. Please log in again.');
             }
 
             try {
