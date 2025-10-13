@@ -43,7 +43,10 @@ class GoogleAuthController extends Controller
                     'https://www.googleapis.com/auth/drive.readonly',
                     'https://www.googleapis.com/auth/drive' ,// Full Drive access (needed for Sheets)
                     //  GOOGLE ANALYTICS SCOPE
-                    "https://www.googleapis.com/auth/analytics.readonly"
+                    "https://www.googleapis.com/auth/analytics.readonly",
+                    //  GOOGLE DOCS SCOPE
+                    'https://www.googleapis.com/auth/documents'
+
                 ])
                 ->redirect();
         }

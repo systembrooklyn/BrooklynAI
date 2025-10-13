@@ -8,11 +8,10 @@ use App\Http\Controllers\Api\EmailController as ApiEmailController;
 use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\GoogleSheetsController;
 use App\Http\Controllers\Api\GoogleAnalyticsController;
+use App\Http\Controllers\Api\GoogleDocsController as ApiGoogleDocsController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\TestLoginController;
-
-
-
+use App\Http\Controllers\GoogleDocsController;
 
 // ONLY FOR DEVELOPMENT - REMOVE IN PRODUCTION
 Route::post('/test/login', [TestLoginController::class, 'login']);
@@ -76,4 +75,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/google/analytics/properties/{propertyId}', [GoogleAnalyticsController::class, 'report']);
     Route::get('google/analytics/properties/{propertyId}/realtime', [GoogleAnalyticsController::class, 'realtime']);
     Route::post('/google/analytics/home-metrics/{propertyId}', [GoogleAnalyticsController::class, 'homeScreenMetrics']);
+    Route::get('/google/analytics/viewsbypage/{propertyId}', [GoogleAnalyticsController::class, 'getTopPagesByViews']);
+});
+
+
+Route::middleware('auth:sanctum')->group(function () {
+    // Google Docs
+    Route::get('/google/docs', [ApiGoogleDocsController ::class, 'index']);
+    Route::post('/google/docs', [ApiGoogleDocsController ::class, 'create']);
+    Route::get('/google/docs/{documentId}', [ApiGoogleDocsController::class, 'show']);
+    Route::post('/google/docs/{documentId}', [ApiGoogleDocsController::class, 'append']);
 });
