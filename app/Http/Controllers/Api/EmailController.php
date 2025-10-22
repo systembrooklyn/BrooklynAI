@@ -48,4 +48,5 @@ class EmailController extends Controller
         }
     }
     
+    
 }

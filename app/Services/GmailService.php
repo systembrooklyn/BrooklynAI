@@ -29,7 +29,7 @@ class GmailService
         $this->client->setAccessType('offline');
         $this->client->setApprovalPrompt('force');
 
-        
+
         $this->client->addScope('https://www.googleapis.com/auth/gmail.send');
 
         // Calculate expiration
@@ -101,5 +101,51 @@ class GmailService
             ]);
             throw $e;
         }
+    }
+    public function sendEmailWithAttachment(
+        array $toEmails,
+        string $subject,
+        string $htmlBody,
+        ?string $pdfBinary = null,
+        ?string $filename = 'document.pdf'
+    ) {
+        $message = new Google_Service_Gmail_Message();
+
+        // Build headers
+        $toHeader = implode(', ', $toEmails);
+        $rawMessage = "From: {$this->user->email}\r\n";
+        $rawMessage .= "To: {$toHeader}\r\n";
+        $rawMessage .= "Subject: {$subject}\r\n";
+        $rawMessage .= "MIME-Version: 1.0\r\n";
+
+        if ($pdfBinary) {
+            // Create multipart email with attachment
+            $boundary = 'boundary_' . md5(time());
+            $rawMessage .= "Content-Type: multipart/mixed; boundary=\"{$boundary}\"\r\n\r\n";
+
+            // HTML part
+            $rawMessage .= "--{$boundary}\r\n";
+            $rawMessage .= "Content-Type: text/html; charset=utf-8\r\n";
+            $rawMessage .= "Content-Transfer-Encoding: quoted-printable\r\n\r\n";
+            $rawMessage .= quoted_printable_encode($htmlBody) . "\r\n\r\n";
+
+            // PDF attachment
+            $rawMessage .= "--{$boundary}\r\n";
+            $rawMessage .= "Content-Type: application/pdf; name=\"{$filename}\"\r\n";
+            $rawMessage .= "Content-Disposition: attachment; filename=\"{$filename}\"\r\n";
+            $rawMessage .= "Content-Transfer-Encoding: base64\r\n\r\n";
+            $rawMessage .= chunk_split(base64_encode($pdfBinary)) . "\r\n";
+            $rawMessage .= "--{$boundary}--\r\n";
+        } else {
+            // Plain HTML email (no attachment)
+            $rawMessage .= "Content-Type: text/html; charset=utf-8\r\n";
+            $rawMessage .= "Content-Transfer-Encoding: quoted-printable\r\n\r\n";
+            $rawMessage .= quoted_printable_encode($htmlBody);
+        }
+
+        $encoded = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($rawMessage));
+        $message->setRaw($encoded);
+
+        return $this->service->users_messages->send('me', $message);
     }
 }

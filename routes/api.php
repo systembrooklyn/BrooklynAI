@@ -26,20 +26,16 @@ Route::get('/user', function (Request $request) {
         'data' => $request->user()->only(['id', 'name', 'avatar', 'email', 'has_bot_access', 'access_expiry'])
     ]);
 })->middleware('auth:sanctum');
-
 // Google Auth Routes (some public, some protected)
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
 Route::get('/auth/google/redirect-google', [GoogleAuthController::class, 'redirectgoogle']);
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
-
 // Protected routes (require authentication)
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [GoogleAuthController::class, 'logout']);
     Route::post('/account/deactivate', [GoogleAuthController::class, 'deactivateAccount']);
-
     // Add Email routes (protected)
     Route::post('/email/send', [ApiEmailController::class, 'sendEmail']);
-
     // Add Calendar routes (protected)
     Route::post('/calendar/events', [CalendarController::class, 'createEvent']);
     Route::get('/calendar/events', [CalendarController::class, 'listEvents']);
@@ -47,7 +43,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/calendar/events/{eventId}', [CalendarController::class, 'updateEvent']);
     Route::delete('/calendar/events/{eventId}', [CalendarController::class, 'deleteEvent']);
 });
-
 // Add Googlesheets routes
 Route::middleware('auth:sanctum')->group(function () {
     // List all spreadsheets from Drive
@@ -66,7 +61,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // append under spacified header
     Route::post('/google-sheets/{spreadsheetId}/append-under-header',  [GoogleSheetsController::class, 'appendUnderHeader']);
 });
-
 //Add GoogleAnalytics Routes
 Route::middleware('auth:sanctum')->group(function () {
     // List GA4 properties the user has access to
@@ -77,12 +71,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/google/analytics/home-metrics/{propertyId}', [GoogleAnalyticsController::class, 'homeScreenMetrics']);
     Route::get('/google/analytics/viewsbypage/{propertyId}', [GoogleAnalyticsController::class, 'getTopPagesByViews']);
 });
-
-
 Route::middleware('auth:sanctum')->group(function () {
-    // Google Docs
-    Route::get('/google/docs', [ApiGoogleDocsController ::class, 'index']);
-    Route::post('/google/docs', [ApiGoogleDocsController ::class, 'create']);
+    // Google Docs- use the fixed from and generate copies after chang vars .
+    Route::post('/google/docs/generate', [ApiGoogleDocsController::class, 'generateFromTemplate']);
+    //  GDocs- attach as pdf and send mail
+    Route::post('/google/docs/generate-and-email', [ApiGoogleDocsController::class, 'generateAndEmailPdf']);
+    //Gdocs
+    Route::get('/google/docs', [ApiGoogleDocsController::class, 'index']);
+    Route::post('/google/docs', [ApiGoogleDocsController::class, 'create']);
+    //Gdocs-Doc->data
     Route::get('/google/docs/{documentId}', [ApiGoogleDocsController::class, 'show']);
     Route::post('/google/docs/{documentId}', [ApiGoogleDocsController::class, 'append']);
+    Route::put('/google/docs/{documentId}', [ApiGoogleDocsController::class, 'update']);
+    Route::delete('/google/docs/{documentId}', [ApiGoogleDocsController::class, 'delete']);
+    // Stream PDF in browser
+    Route::get('/google/docs/{documentId}/pdf', [ApiGoogleDocsController::class, 'downloadPdf']);
 });
