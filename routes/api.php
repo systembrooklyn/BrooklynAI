@@ -6,12 +6,18 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\EmailController as ApiEmailController;
 use App\Http\Controllers\Api\CalendarController;
+use App\Http\Controllers\Api\FacebookAuthController as ApiFacebookAuthController;
+use App\Http\Controllers\Api\FacebookWebhookController as ApiFacebookWebhookController;
 use App\Http\Controllers\Api\GoogleSheetsController;
 use App\Http\Controllers\Api\GoogleAnalyticsController;
 use App\Http\Controllers\Api\GoogleDocsController as ApiGoogleDocsController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\TestLoginController;
 use App\Http\Controllers\GoogleDocsController;
+use App\Services\FacebookLeadService;
+use App\Http\Controllers\FacebookWebhookController;
+use App\Http\Controllers\FacebookAuthController;
+
 
 // ONLY FOR DEVELOPMENT - REMOVE IN PRODUCTION
 Route::post('/test/login', [TestLoginController::class, 'login']);
@@ -87,3 +93,33 @@ Route::middleware('auth:sanctum')->group(function () {
     // Stream PDF in browser
     Route::get('/google/docs/{documentId}/pdf', [ApiGoogleDocsController::class, 'downloadPdf']);
 });
+
+
+// // Manual lead fetching (works on localhost — NO ngrok needed)
+// Route::get('/test-leads', function () {
+//     try {
+//         $service = new FacebookLeadService();
+//         $leads = $service->fetchLeads();
+//         return response()->json($leads);
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'error' => $e->getMessage(),
+//             'hint' => 'Set META_ACCESS_TOKEN and META_LEAD_FORM_ID in .env'
+//         ], 400);
+//     }
+// });
+// // Webhook for real-time leads (requires ngrok + public HTTPS)
+Route::match(['get', 'post'], '/webhooks/facebook-leads', [FacebookWebhookController::class, 'handle']);
+
+
+// Facebook OAuth Flow
+Route::get('/auth/facebook/redirect', [ApiFacebookAuthController::class, 'redirectToFacebook']);
+Route::get('/auth/facebook/callback', [ApiFacebookAuthController::class, 'handleCallback']);
+
+// After login
+Route::get('/facebook/pages', [ApiFacebookAuthController ::class, 'getPages']);
+Route::post('/facebook/leads', [ApiFacebookAuthController::class, 'getLeads']);
+Route::get('/facebook/leads/{leadId}', [ApiFacebookAuthController::class, 'getLeadDetails']);
+Route::post('/facebook/insights', [ApiFacebookAuthController::class, 'getPageInsights']);
+
+

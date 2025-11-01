@@ -41,7 +41,7 @@ class GoogleAuthController extends Controller
                     //  GOOGLE DRIVE SCOPE
                     'https://www.googleapis.com/auth/drive',
                     'https://www.googleapis.com/auth/drive.readonly',
-                    'https://www.googleapis.com/auth/drive' ,// Full Drive access (needed for Sheets)
+                    'https://www.googleapis.com/auth/drive', // Full Drive access (needed for Sheets)
                     //  GOOGLE ANALYTICS SCOPE
                     "https://www.googleapis.com/auth/analytics.readonly",
                     //  GOOGLE DOCS SCOPE
@@ -87,14 +87,16 @@ class GoogleAuthController extends Controller
                 // ]);
             } else {
                 //  ADDED: Update tokens for existing users
-                $user->update([
-                    'name'      => $googleUser->name,
-                    'google_id' => $googleUser->id,
-                    'avatar'    => $googleUser->avatar ?? null,
-                    'google_access_token' => $googleUser->token,
-                    'google_refresh_token' => $googleUser->refreshToken ?? $user->google_refresh_token,
-                    'google_token_expires_at' => now()->addSeconds($googleUser->expiresIn),
-                ]);
+                $user->update(
+                    [
+                        'name'      => $googleUser->name,
+                        'google_id' => $googleUser->id,
+                        'avatar'    => $googleUser->avatar ?? null,
+                        'google_access_token' => $googleUser->token,
+                        'google_refresh_token' => $googleUser->refreshToken ?? $user->google_refresh_token,
+                        'google_token_expires_at' => now()->addSeconds($googleUser->expiresIn),
+                    ]
+                );
             }
             $acs = $user->has_bot_access;
 

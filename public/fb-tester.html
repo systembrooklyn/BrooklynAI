@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Facebook API Tester (DB Token)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 20px; background: #f8f9fa; }
+    .card { margin-bottom: 20px; }
+    pre { background: #f1f1f1; padding: 12px; border-radius: 6px; overflow: auto; font-size: 0.9em; }
+    .lead-card { border-left: 4px solid #0d6efd; }
+    .error { color: #dc3545; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 class="mb-4">🔍 Facebook API Tester (Token from DB)</h2>
+    <div id="status" class="alert alert-info">Loading...</div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5>1. Your Pages</h5>
+        <button class="btn btn-success" onclick="loadPages()">Get Pages</button>
+        <div id="pagesResult" class="mt-3"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5>2. Leads</h5>
+        <div id="leadsResult"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5>3. Lead Details</h5>
+        <div id="leadDetailResult"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h5>4. Insights</h5>
+        <div id="insightsResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin + '/api';
+    let facebookUserId = null;
+
+    function init() {
+      const urlParams = new URLSearchParams(window.location.search);
+      facebookUserId = urlParams.get('facebook_user_id');
+
+      if (!facebookUserId) {
+        document.getElementById('status').className = 'alert alert-danger';
+        document.getElementById('status').innerText = '❌ No facebook_user_id in URL. Please log in first.';
+        return;
+      }
+
+      document.getElementById('status').className = 'alert alert-success';
+      document.getElementById('status').innerText = `✅ Logged in as Facebook User ID: ${facebookUserId}`;
+      loadPages();
+    }
+
+    async function callApi(endpoint, params = {}) {
+      if (!facebookUserId) throw new Error('No user ID');
+
+      // Add facebook_user_id to query or body
+      const url = new URL(API_BASE + endpoint);
+      if (['GET'].includes('GET')) {
+        url.searchParams.append('facebook_user_id', facebookUserId);
+      }
+
+      const options = { method: 'GET' };
+      if (!['GET'].includes('GET')) {
+        options.method = 'POST';
+        options.headers = { 'Content-Type': 'application/json' };
+        options.body = JSON.stringify({ ...params, facebook_user_id: facebookUserId });
+      }
+
+      const res = await fetch(url.toString(), options);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return await res.json();
+    }
+
+    async function loadPages() {
+      try {
+        const pages = await callApi('/facebook/pages');
+        if (!Array.isArray(pages)) throw new Error('Invalid response');
+
+        let html = `<div class="row">`;
+        pages.forEach(page => {
+          html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+              <div class="card">
+                <div class="card-body">
+                  <h6>${page.name}</h6>
+                  <p class="text-muted">${page.category || 'Page'}</p>
+                  <p><strong>ID:</strong> ${page.id}</p>
+                  <button class="btn btn-sm btn-primary me-2" onclick="loadLeads('${page.id}')">Fetch Leads</button>
+                  <button class="btn btn-sm btn-success" onclick="loadInsights('${page.id}')">Get Insights</button>
+                </div>
+              </div>
+            </div>`;
+        });
+        html += `</div>`;
+        document.getElementById('pagesResult').innerHTML = html;
+      } catch (e) {
+        document.getElementById('pagesResult').innerHTML = `<div class="alert alert-danger">Error: ${e.message}</div>`;
+      }
+    }
+
+    async function loadLeads(pageId) {
+      try {
+        const leads = await callApi('/facebook/leads', { page_id: pageId });
+        if (!Array.isArray(leads)) throw new Error('Invalid leads');
+
+        if (leads.length === 0) {
+          document.getElementById('leadsResult').innerHTML = `<div class="alert alert-warning">No leads</div>`;
+          return;
+        }
+
+        let html = `<h5>Leads</h5><div class="row">`;
+        leads.forEach(lead => {
+          const fields = lead.field_data?.reduce((acc, f) => {
+            acc[f.name] = Array.isArray(f.values) ? f.values.join(', ') : f.values;
+            return acc;
+          }, {}) || {};
+
+          html += `
+            <div class="col-md-6 mb-3">
+              <div class="card lead-card">
+                <div class="card-body">
+                  <h6>${lead.form_name}</h6>
+                  <p><small><strong>Lead ID:</strong> ${lead.id}</small></p>
+                  <p><strong>Created:</strong> ${new Date(lead.created_time).toLocaleString()}</p>
+                  <ul>`;
+          for (const [key, value] of Object.entries(fields)) {
+            html += `<li><strong>${key}:</strong> ${value}</li>`;
+          }
+          html += `</ul>
+                  <button class="btn btn-sm btn-info" onclick="loadLeadDetails('${lead.id}')">View</button>
+                </div>
+              </div>
+            </div>`;
+        });
+        html += `</div>`;
+        document.getElementById('leadsResult').innerHTML = html;
+      } catch (e) {
+        document.getElementById('leadsResult').innerHTML = `<div class="alert alert-danger">Leads: ${e.message}</div>`;
+      }
+    }
+
+    async function loadLeadDetails(leadId) {
+      try {
+        const detail = await callApi(`/facebook/leads/${leadId}`);
+        document.getElementById('leadDetailResult').innerHTML = `<h5>Lead Details</h5><pre>${JSON.stringify(detail, null, 2)}</pre>`;
+      } catch (e) {
+        document.getElementById('leadDetailResult').innerHTML = `<div class="alert alert-danger">Lead: ${e.message}</div>`;
+      }
+    }
+
+    async function loadInsights(pageId) {
+      try {
+        const insights = await callApi('/facebook/insights', { page_id: pageId });
+        if (!Array.isArray(insights)) throw new Error('Invalid insights');
+
+        let html = `<h5>Insights</h5><div class="table-responsive"><table class="table table-striped">
+          <thead><tr><th>Metric</th><th>Value</th><th>Period</th><th>Date</th></tr></thead><tbody>`;
+        insights.forEach(m => {
+          m.values?.forEach(v => {
+            html += `<tr><td>${m.name}</td><td>${v.value}</td><td>${m.period}</td><td>${v.end_time ? new Date(v.end_time).toLocaleDateString() : 'N/A'}</td></tr>`;
+          });
+        });
+        html += `</tbody></table></div>`;
+        document.getElementById('insightsResult').innerHTML = html;
+      } catch (e) {
+        document.getElementById('insightsResult').innerHTML = `<div class="alert alert-danger">Insights: ${e.message}</div>`;
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

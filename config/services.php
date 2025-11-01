@@ -41,4 +41,21 @@ return [
     ],
 
 
+    // config/services.php
+    // ... other services
+
+    'meta' => [
+        'app_id' => env('META_APP_ID'),
+        'app_secret' => env('META_APP_SECRET'),
+        'redirect_uri' => env('META_REDIRECT_URI'),
+        'access_token' => env('META_ACCESS_TOKEN'),
+        'lead_form_id' => env('META_LEAD_FORM_ID'),
+        'verify_token' => env('META_VERIFY_TOKEN'),
+    ],
+
+    'facebook' => [
+    'client_id' => env('META_APP_ID'),
+    'client_secret' => env('META_APP_SECRET'),
+    'redirect' => env('META_REDIRECT_URI'),
+],
 ];
