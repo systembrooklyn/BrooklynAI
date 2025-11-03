@@ -119,8 +119,7 @@ class GoogleAuthController extends Controller
             // ]);
             // Redirect to HTML page with token & user data as query params
             return redirect()->away(url('https://www.aibrooklyn.net?token=' . urlencode($token)
-                . '&acs=' . $acs . '&user=' .
-                urlencode(json_encode($user->only('id', 'name', 'email', 'avatar')))));
+                ));
 
 
 
