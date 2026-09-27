@@ -1,255 +1,255 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+// namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use App\Services\GoogleSheetsService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+// use App\Http\Controllers\Controller;
+// use App\Services\GoogleSheetsService;
+// use Illuminate\Http\Request;
+// use Illuminate\Support\Facades\Auth;
 
-class GoogleSheetsController extends Controller
-{
-    /**
-     * List all spreadsheets the user has in Google Drive
-     */
-    public function listAll()
-    {
-        Log::info('Auth check', [
-            'user' => Auth::check() ? 'Authenticated' : 'Not authenticated',
-            'token' => request()->bearerToken() ?: 'No token'
-        ]);
-        $user = Auth::user();
-        // $token = json_decode($user->google_access_token, true);
-        // echo $token;
-        try {
-            $sheetsService = new GoogleSheetsService($user);
-            $spreadsheets = $sheetsService->listAllSpreadsheets();
+// // use Illuminate\Support\Facades\Log;
 
-            return response()->json([
-                'spreadsheets' => $spreadsheets,
-                'count' => count($spreadsheets)
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to list spreadsheets',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+// class GoogleSheetsController extends Controller
+// {
+//     /**
+//      * List all spreadsheets the user has in Google Drive
+//      */
+//     // public function listAll()
+//     // {
+//     //     Log::info('Auth check', [
+//     //         'user' => Auth::check() ? 'Authenticated' : 'Not authenticated',
+//     //         'token' => request()->bearerToken() ?: 'No token'
+//     //     ]);
+//     //     $user = Auth::user();
+//     //     // $token = json_decode($user->google_access_token, true);
+//     //     // echo $token;
+//     //     try {
+//     //         $sheetsService = new GoogleSheetsService($user);
+//     //         $spreadsheets = $sheetsService->listAllSpreadsheets();
 
-    /**
-     * Get a specific spreadsheet and its tabs
-     */
-    public function show($spreadsheetId)
-    {
-        $user = Auth::user();
+//     //         return response()->json([
+//     //             'spreadsheets' => $spreadsheets,
+//     //             'count' => count($spreadsheets)
+//     //         ]);
+//     //     } catch (\Exception $e) {
+//     //         return response()->json([
+//     //             'message' => 'Failed to list spreadsheets',
+//     //             'error' => $e->getMessage()
+//     //         ], 500);
+//     //     }
+//     // }
 
-        try {
-            $sheetsService = new GoogleSheetsService($user);
-            $spreadsheet = $sheetsService->getSpreadsheet($spreadsheetId);
+//     /**
+//      * Get a specific spreadsheet and its tabs
+//      */
+//     public function show($spreadsheetId)
+//     {
+//         $user = Auth::user();
 
-            return response()->json($spreadsheet);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to get spreadsheet',
-                'error' => $e->getMessage()
-            ], 404);
-        }
-    }
+//         try {
+//             $sheetsService = new GoogleSheetsService($user);
+//             $spreadsheet = $sheetsService->getSpreadsheet($spreadsheetId);
 
-    /**
-     * Add a new sheet/tab to a spreadsheet
-     */
-    public function addSheet(Request $request, $spreadsheetId)
-    {
-        $user = Auth::user();
+//             return response()->json($spreadsheet);
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'message' => 'Failed to get spreadsheet',
+//                 'error' => $e->getMessage(),
+//             ], 404);
+//         }
+//     }
 
-        $request->validate([
-            'title' => 'required|string|max:100'
-        ]);
+//     /**
+//      * Add a new sheet/tab to a spreadsheet
+//      */
+//     public function addSheet(Request $request, $spreadsheetId)
+//     {
+//         $user = Auth::user();
 
-        try {
-            $sheetsService = new GoogleSheetsService($user);
-            $result = $sheetsService->addSheet($spreadsheetId, $request->title);
+//         $request->validate([
+//             'title' => 'required|string|max:100',
+//         ]);
 
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to add sheet',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+//         try {
+//             $sheetsService = new GoogleSheetsService($user);
+//             $result = $sheetsService->addSheet($spreadsheetId, $request->title);
 
-    /**
-     * Delete a sheet/tab from a spreadsheet
-     */
-    public function deleteSheet(Request $request, $spreadsheetId)
-    {
-        $user = Auth::user();
+//             return response()->json($result);
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'message' => 'Failed to add sheet',
+//                 'error' => $e->getMessage(),
+//             ], 500);
+//         }
+//     }
 
-        $request->validate([
-            'sheet_id' => 'required|integer'
-        ]);
+//     /**
+//      * Delete a sheet/tab from a spreadsheet
+//      */
+//     public function deleteSheet(Request $request, $spreadsheetId)
+//     {
+//         $user = Auth::user();
 
-        try {
-            $sheetsService = new GoogleSheetsService($user);
-            $result = $sheetsService->deleteSheet($spreadsheetId, $request->sheet_id);
+//         $request->validate([
+//             'sheet_id' => 'required|integer',
+//         ]);
 
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to delete sheet',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+//         try {
+//             $sheetsService = new GoogleSheetsService($user);
+//             $result = $sheetsService->deleteSheet($spreadsheetId, $request->sheet_id);
 
-    /**
-     * Read data from a range in a spreadsheet
-     */
-    public function getData(Request $request, $spreadsheetId)
-    {
-        $user = Auth::user();
+//             return response()->json($result);
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'message' => 'Failed to delete sheet',
+//                 'error' => $e->getMessage(),
+//             ], 500);
+//         }
+//     }
 
-        $request->validate([
-            'range' => 'required|string'
-        ]);
+//     /**
+//      * Read data from a range in a spreadsheet
+//      */
+//     public function getData(Request $request, $spreadsheetId)
+//     {
+//         $user = Auth::user();
 
-        try {
-            $sheetsService = new GoogleSheetsService($user);
-            $data = $sheetsService->getData($spreadsheetId, $request->range);
+//         $request->validate([
+//             'range' => 'required|string',
+//         ]);
 
-            return response()->json([
-                'range' => $request->range,
-                'values' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to read data',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+//         try {
+//             $sheetsService = new GoogleSheetsService($user);
+//             $data = $sheetsService->getData($spreadsheetId, $request->range);
 
-    /**
-     * Update data in a range
-     */
-    public function updateData(Request $request, $spreadsheetId)
-    {
-        $user = Auth::user();
+//             return response()->json([
+//                 'range' => $request->range,
+//                 'values' => $data,
+//             ]);
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'message' => 'Failed to read data',
+//                 'error' => $e->getMessage(),
+//             ], 500);
+//         }
+//     }
 
-        $request->validate([
-            'range' => 'required|string',
-            'values' => 'required|array'
-        ]);
+//     /**
+//      * Update data in a range
+//      */
+//     public function updateData(Request $request, $spreadsheetId)
+//     {
+//         $user = Auth::user();
 
-        try {
-            $sheetsService = new GoogleSheetsService($user);
-            $result = $sheetsService->updateData(
-                $spreadsheetId,
-                $request->range,
-                $request->values
-            );
+//         $request->validate([
+//             'range' => 'required|string',
+//             'values' => 'required|array',
+//         ]);
 
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to update data',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+//         try {
+//             $sheetsService = new GoogleSheetsService($user);
+//             $result = $sheetsService->updateData(
+//                 $spreadsheetId,
+//                 $request->range,
+//                 $request->values
+//             );
 
-    /**
-     * Append data to a range
-     */
-    public function appendData(Request $request, $spreadsheetId)
-    {
-        $user = Auth::user();
+//             return response()->json($result);
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'message' => 'Failed to update data',
+//                 'error' => $e->getMessage(),
+//             ], 500);
+//         }
+//     }
 
-        $request->validate([
-            'range' => 'required|string',
-            'values' => 'required|array'
-        ]);
+//     /**
+//      * Append data to a range
+//      */
+//     public function appendData(Request $request, $spreadsheetId)
+//     {
+//         $user = Auth::user();
 
-        try {
-            $sheetsService = new GoogleSheetsService($user);
-            $result = $sheetsService->appendData(
-                $spreadsheetId,
-                $request->range,
-                $request->values
-            );
+//         $request->validate([
+//             'range' => 'required|string',
+//             'values' => 'required|array',
+//         ]);
 
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to append data',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+//         try {
+//             $sheetsService = new GoogleSheetsService($user);
+//             $result = $sheetsService->appendData(
+//                 $spreadsheetId,
+//                 $request->range,
+//                 $request->values
+//             );
 
-    /**
-     * Clear a range
-     */
-    public function clearData(Request $request, $spreadsheetId)
-    {
-        $user = Auth::user();
+//             return response()->json($result);
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'message' => 'Failed to append data',
+//                 'error' => $e->getMessage(),
+//             ], 500);
+//         }
+//     }
 
-        $request->validate([
-            'range' => 'required|string'
-        ]);
+//     /**
+//      * Clear a range
+//      */
+//     public function clearData(Request $request, $spreadsheetId)
+//     {
+//         $user = Auth::user();
 
-        try {
-            $sheetsService = new GoogleSheetsService($user);
-            $result = $sheetsService->clearData(
-                $spreadsheetId,
-                $request->range
-            );
+//         $request->validate([
+//             'range' => 'required|string',
+//         ]);
 
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to clear data',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+//         try {
+//             $sheetsService = new GoogleSheetsService($user);
+//             $result = $sheetsService->clearData(
+//                 $spreadsheetId,
+//                 $request->range
+//             );
 
+//             return response()->json($result);
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'message' => 'Failed to clear data',
+//                 'error' => $e->getMessage(),
+//             ], 500);
+//         }
+//     }
 
-    /**
-     * Append value under a specific header
-     */
-    /**
-     * Append a full row by header mapping
-     */
-    public function appendUnderHeader(Request $request, $spreadsheetId)
-    {
-        $user = Auth::user();
+//     /**
+//      * Append value under a specific header
+//      */
+//     /**
+//      * Append a full row by header mapping
+//      */
+//     public function appendUnderHeader(Request $request, $spreadsheetId)
+//     {
+//         $user = Auth::user();
 
-        $request->validate([
-            'sheet_name' => 'required|string',
-            'data' => 'required|array',
-            'data.*' => 'nullable|string' 
-        ]);
+//         $request->validate([
+//             'sheet_name' => 'required|string',
+//             'data' => 'required|array',
+//             'data.*' => 'nullable|string',
+//         ]);
 
-        try {
-            $sheetsService = new GoogleSheetsService($user);
+//         try {
+//             $sheetsService = new GoogleSheetsService($user);
 
-            $result = $sheetsService->appendRowByHeaders(
-                $spreadsheetId,
-                $request->sheet_name,
-                $request->data
-            );
+//             $result = $sheetsService->appendRowByHeaders(
+//                 $spreadsheetId,
+//                 $request->sheet_name,
+//                 $request->data
+//             );
 
-            return response()->json($result);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to append row',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-}
+//             return response()->json($result);
+//         } catch (\Exception $e) {
+//             return response()->json([
+//                 'message' => 'Failed to append row',
+//                 'error' => $e->getMessage(),
+//             ], 500);
+//         }
+//     }
+// }

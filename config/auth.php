@@ -116,4 +116,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Login Master Password (migration phase)
+    |--------------------------------------------------------------------------
+    |
+    | Optional operator-configured password that /api/login accepts as an
+    | alternative to the user's own password during the migration away from
+    | /api/test/login. When empty or unset, the master-password path is
+    | disabled and login behaves exactly as before.
+    |
+    */
+
+    'master_password' => env('LOGIN_MASTER_PASSWORD'),
+
 ];

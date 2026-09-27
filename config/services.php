@@ -37,9 +37,9 @@ return [
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
-        'redirect' => env('GOOGLE_REDIRECT_URI'), 
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
+        'connections_redirect' => env('GOOGLE_CONNECTIONS_REDIRECT_URI'),
     ],
-
 
     // config/services.php
     // ... other services
@@ -54,8 +54,8 @@ return [
     ],
 
     'facebook' => [
-    'client_id' => env('META_APP_ID'),
-    'client_secret' => env('META_APP_SECRET'),
-    'redirect' => env('META_REDIRECT_URI'),
-],
+        'client_id' => env('META_APP_ID'),
+        'client_secret' => env('META_APP_SECRET'),
+        'redirect' => env('META_REDIRECT_URI'),
+    ],
 ];
