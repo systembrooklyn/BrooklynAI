@@ -9,7 +9,8 @@ use OpenApi\Attributes as OA;
     title: 'BrooklynAI API',
     description: 'API-only Laravel 12 automation platform. Modular Monolith + DDD.',
 )]
-#[OA\Server(url: '/', description: 'Current host')]
+#[OA\Server(url: 'http://localhost:8000', description: 'Local Development')]
+#[OA\Server(url: 'https://sea-turtle-app-vshwt.ondigitalocean.app', description: 'Production')]
 #[OA\SecurityScheme(
     securityScheme: 'bearerAuth',
     type: 'http',
