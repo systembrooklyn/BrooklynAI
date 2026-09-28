@@ -40,7 +40,7 @@ final class EloquentWorkflowRepository implements WorkflowRepository
 
         return $query->orderByDesc('id')
             ->get()
-            ->map(fn (WorkflowModel $m) => $this->toEntity($m))
+            ->map(fn(WorkflowModel $m) => $this->toEntity($m))
             ->all();
     }
 
@@ -149,7 +149,7 @@ final class EloquentWorkflowRepository implements WorkflowRepository
             ->where('workflow_id', $workflowId)
             ->orderBy('position')
             ->get()
-            ->map(fn (WorkflowStepModel $m) => $this->stepToEntity($m))
+            ->map(fn(WorkflowStepModel $m) => $this->stepToEntity($m))
             ->all();
     }
 
@@ -268,5 +268,17 @@ final class EloquentWorkflowRepository implements WorkflowRepository
     private function toImmutable(?DateTimeInterface $value): ?DateTimeImmutable
     {
         return $value === null ? null : DateTimeImmutable::createFromInterface($value);
+    }
+    public function listAllActiveWithTriggerDue(DateTimeImmutable $now, int $limit = 50): array
+    {
+        return $this->hydrateActivePairs(
+            WorkflowTriggerModel::query()
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('next_poll_at')->orWhere('next_poll_at', '<=', $now);
+                })
+                ->orderBy('next_poll_at')
+                ->limit($limit)
+                ->get()
+        );
     }
 }

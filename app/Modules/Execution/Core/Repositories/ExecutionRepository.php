@@ -50,4 +50,12 @@ interface ExecutionRepository
         int $observedRetryAttempts,
         int $maxRetries,
     ): bool;
+    
+    /**
+     * Mark executions that have been stuck in "running" state past the
+     * given threshold as "failed". Returns the number of rows updated.
+     *
+     * This is idempotent: rows already terminal are not affected.
+     */
+    public function markStaleRunningAsFailed(DateTimeImmutable $startedBefore): int;
 }

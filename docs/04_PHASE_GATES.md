@@ -184,57 +184,33 @@ Provide accurate, maintainable, frontend-consumable Swagger/OpenAPI documentatio
 - `darkaonline/l5-swagger` **11.1.0**
 - `zircote/swagger-php` **6.10.0** (transitive)
 - `swagger-api/swagger-ui` **v5.33.0** (transitive)
-- Compatible with Laravel 12.31.1 / PHP 8.2.12.
+- Laravel 12.31.1 / PHP 8.2.12.
 
 **Structure:**
 
 - Global configuration: `app/Modules/Swagger/OpenApi.php`.
-- Per-module path files: Identity, Connections, Automation, Execution, Integrations (Gmail, Calendar, Sheets, Docs, Analytics).
+- Per-module path files: Identity, Connections, Automation, Execution, Integrations.
 
 **Configuration:**
 
 - `config/l5-swagger.php` published.
 - Scan path: `base_path('app/Modules')`.
-- No annotations in runtime controllers, FormRequests, DTOs, repositories, or services.
+- No annotations in runtime code.
 
 **Coverage:**
 
-- 57 operations, 57 unique operationIds at Phase 8 close.
-- Additional operations added by later batches (Catalog, Login).
+- 57 operations, 57 unique operationIds at Phase 8 close. Catalog + Login batches added one each.
 
 **Security:**
 
 - Sanctum bearer scheme documented as `bearerAuth` and applied to protected operations.
 
-**Error responses:**
-
-- 409 capability error structure (`CapabilityError`) documented for activation.
-- 422 validation error structure documented.
-- 401 / 404 / 409 / 500 documented where actually returned.
-
 **Excluded:**
 
-- `/api/test/login` (dev-only).
+- `/api/test/login`.
 - Facebook legacy endpoints.
 - Console commands.
 - All deferred Phase 7 capabilities.
-
-## Phase 8 Verification Results
-
-```text
-php artisan l5-swagger:generate
-→ exit 0, no warnings
-
-storage/api-docs/api-docs.json
-→ 57 operationIds, 57 unique
-→ JSON valid
-
-composer test
-→ 607 passed / 1749 assertions / 0 failures
-
-vendor/bin/pint --test app/Modules
-→ PASS (307 files)
-```
 
 ## Phase 8 Gate
 
@@ -243,7 +219,7 @@ vendor/bin/pint --test app/Modules
 - [x] Global configuration in `app/Modules/Swagger/OpenApi.php`.
 - [x] Per-module path files.
 - [x] No annotations in runtime code.
-- [x] L5-Swagger scan path configured to `app/Modules`.
+- [x] L5-Swagger scan path configured.
 - [x] Only existing endpoints documented.
 - [x] Sanctum bearer security scheme documented and applied.
 - [x] 409 capability error structure documented.
@@ -271,15 +247,14 @@ Human approval: **received**.
 
 ## Goal
 
-Provide a stable, read-only, code-defined Catalog / Discovery contract so the mobile application can render the automation UI without hardcoding or guessing available integrations, triggers, actions, capabilities, scopes, and configuration fields.
+Provide a stable, read-only, code-defined Catalog / Discovery contract.
 
 ## Scope
 
 - `GET /api/catalog`, `auth:sanctum`, operationId `catalog.show`, tag `Catalog`.
-- Response derived from `IntegrationCatalog` — single source of truth.
+- Response derived from `IntegrationCatalog`.
 - Field metadata added to `ActionDefinition` / `TriggerDefinition` as optional `array $fields = []`.
 - New `FieldDefinition` value object.
-- No second registry, no DB table, no form-builder framework.
 
 ## Non-Goals
 
@@ -290,49 +265,14 @@ Provide a stable, read-only, code-defined Catalog / Discovery contract so the mo
 
 ## Delivered
 
-**Core value object:**
-
 - `app/Modules/Integrations/Core/ValueObjects/FieldDefinition.php`
-
-**Application:**
-
 - `app/Modules/Integrations/Application/Services/CatalogProjector.php`
-
-**Http:**
-
 - `app/Modules/Integrations/Http/Controllers/CatalogController.php`
 - `app/Modules/Integrations/Http/Routes/api.php`
-
-**Definition extension:**
-
 - `app/Modules/Integrations/Core/Entities/ActionDefinition.php`
 - `app/Modules/Integrations/Core/Entities/TriggerDefinition.php`
-
-**Verified field metadata:**
-
-- `GmailIntegration` — `send_email` carries `to` / `subject` / `body`; `new_email_received` carries `label_id`.
-
-**Swagger:**
-
-- `app/Modules/Integrations/Swagger/Catalog.php`.
-
-**Tests:**
-
-- `tests/Feature/Integrations/CatalogEndpointTest.php` — 11 tests.
-- `tests/Unit/Integrations/FieldDefinitionTest.php` — 3 tests.
-
-## Verification Results
-
-```text
-composer test
-→ 621 passed / 1893 assertions / 0 failures
-
-vendor/bin/pint --test app/Modules
-→ PASS (311 files)
-
-php artisan l5-swagger:generate
-→ exit 0, no warnings
-```
+- `app/Modules/Integrations/Swagger/Catalog.php`
+- Tests: `CatalogEndpointTest` (11 tests), `FieldDefinitionTest` (3 tests).
 
 ## Catalog Batch Gate
 
@@ -360,12 +300,12 @@ Human approval: **received**.
 
 ## Goal
 
-Add a first-class email/password login endpoint that authenticates an already-provisioned user, issues a Sanctum bearer token, and returns the authenticated user in the standard API envelope.
+Add a first-class email/password login endpoint.
 
 ## Scope
 
-- `POST /api/login` (public, no auth).
-- Implemented inside the existing Identity bounded context using a thin-module layout.
+- `POST /api/login` (public).
+- Implemented inside the existing Identity bounded context.
 - Reads `App\Models\User` directly; no repository abstraction introduced.
 - Does not create users.
 - Does not modify `/api/register`, Google OAuth, Sanctum config, or the `User` model.
@@ -373,33 +313,14 @@ Add a first-class email/password login endpoint that authenticates an already-pr
 
 ## Delivered
 
-**Application:**
-
 - `app/Modules/Identity/Application/DTOs/LoginInput.php`
 - `app/Modules/Identity/Application/Actions/LoginAction.php`
-
-**Http:**
-
 - `app/Modules/Identity/Http/Requests/LoginRequest.php`
 - `app/Modules/Identity/Http/Controllers/LoginController.php`
 - `app/Modules/Identity/Http/Routes/api.php`
-
-**Infrastructure:**
-
 - `app/Modules/Identity/Infrastructure/Providers/IdentityServiceProvider.php`
-- Registered in `bootstrap/providers.php`.
-
-**Swagger:**
-
-- `app/Modules/Identity/Swagger/Identity.php` — `POST /api/login`, operationId `auth.login`, tag `Authentication`.
-
-**Tests:**
-
-- `tests/Feature/Identity/LoginTest.php` — 11 tests.
-
-**Documentation:**
-
-- `docs/06_MOBILE_API_CONTRACT.md` — v1.0.3, login contract documented.
+- `app/Modules/Identity/Swagger/Identity.php`
+- Tests: `LoginTest` (11 tests).
 
 ## Behavior
 
@@ -407,28 +328,9 @@ Add a first-class email/password login endpoint that authenticates an already-pr
 - `Hash::check()` for verification.
 - Sanctum token issued on success.
 - Response: `{ message: "Login successful.", data: { token, user } }`.
-- Same generic `401 { "message": "Invalid credentials." }` for unknown email, wrong password, soft-deleted user, and unusable stored password.
-- `has_bot_access` is not required and not modified.
-- `access_expiry` is not modified.
-- Soft-deleted users are excluded via SoftDeletes.
-
-## Verification Results
-
-```text
-php artisan test --filter=LoginTest
-→ 11 passed / 36 assertions
-
-php artisan test
-→ 632 passed / 1929 assertions
-
-composer test
-→ 632 passed / 1929 assertions / 26.32s
-
-vendor/bin/pint --test app/Modules/Identity tests/Feature/Identity
-→ PASS (8 files)
-```
-
-Test delta: 621 → 632 = +11. No regressions.
+- Same generic `401 { "message": "Invalid credentials." }` for all credential failures.
+- `has_bot_access` not required and not modified.
+- `access_expiry` not modified.
 
 ## Login Batch Gate
 
@@ -450,15 +352,13 @@ Test delta: 621 → 632 = +11. No regressions.
 - [x] Pint green on the affected scope.
 - [x] Human approval to close the Login batch.
 
-## Login Batch — Closure Criterion
-
-The Login API batch is formally closed. Status: `COMPLETE / CLOSED / VERIFIED`.
+Login API batch is `COMPLETE / CLOSED / VERIFIED`.
 
 ---
 
 # Post-Phase-8 Completed Branches
 
-The following branches were completed after Phase 8 without being opened as a new numbered phase. They are recorded here so the phase history remains accurate and no Phase 9 is implied.
+The following branches were completed after Phase 8 without being opened as a new numbered phase.
 
 ---
 
@@ -466,24 +366,11 @@ The following branches were completed after Phase 8 without being opened as a ne
 
 Status: `COMPLETE / CLOSED / VERIFIED`.
 
-## Goal
-
-Address operational and safety defects in the Gmail polling runtime:
-
-- duplicate queued jobs for the same logical Gmail event
-- event loss when a workflow execution was already in progress
-- cursor re-reading self-authored messages
-- non-retryable queued executions
-- no recovery for failed polling executions
-- no rate limit on workflow dispatch
-- concurrent pollers processing the same trigger
-- no explicit polling cadence
-
 ## Delivered
 
 **Runtime:**
 
-- `PollGmailCommand` — self-email filter, `hasInProgressForWorkflow` check, per-trigger `Cache::lock('poll-trigger:{id}', 90)`, cursor advancement past skipped messages, `next_poll_at` scheduling per `interval_minutes`, `RateLimiter` at dispatch.
+- `PollGmailCommand` — self-email filter, `hasInProgressForWorkflow` check, per-trigger cache lock, cursor advancement past skipped messages, `next_poll_at` scheduling, rate limiter at dispatch.
 - `RunWorkflowJob` — `ShouldQueue`, `ShouldBeUnique`, `$tries = 3`, `$backoff = [30, 120, 600]`, `$uniqueFor = 3600`.
 - `RecoverFailedPollExecutionsCommand` — `MAX_RETRIES = 3`, `GRACE_MINUTES = 10`, `BATCH_SIZE = 100`, CAS claim, `retry_of_id` lineage.
 
@@ -503,20 +390,6 @@ Address operational and safety defects in the Gmail polling runtime:
 - `ActivateWorkflowAction` resets `next_poll_at = null` on activation.
 - `UpsertWorkflowTriggerAction` preserves `next_poll_at` on update.
 
-**Tests:**
-
-- `tests/Feature/Execution/PollGmailCommandTest.php`
-- `tests/Feature/Execution/PollGmailCursorAdvancesOverSelfEmailsTest.php`
-- `tests/Feature/Execution/PollGmailDuplicateDispatchTest.php`
-- `tests/Feature/Execution/PollGmailIdempotencyAndCursorTest.php`
-- `tests/Feature/Execution/PollGmailRateLimitTest.php`
-- `tests/Feature/Execution/PollGmailSelfEmailExclusionTest.php`
-- `tests/Feature/Execution/RecoverFailedPollExecutionsTest.php`
-- `tests/Feature/Execution/ReservedIdempotencyNamespaceTest.php`
-- `tests/Feature/Execution/RunWorkflowJobRetryLinkTest.php`
-- `tests/Feature/Automation/ActivateWorkflowResetsNextPollAtTest.php`
-- `tests/Feature/Automation/WorkflowTriggerPollCursorTest.php`
-
 ## Gmail Polling Hardening Gate
 
 - [x] Unique job per logical Gmail event.
@@ -527,7 +400,6 @@ Address operational and safety defects in the Gmail polling runtime:
 - [x] Rate limiter at dispatch.
 - [x] Per-trigger cache lock.
 - [x] Focused tests green.
-- [x] Gmail loop incident closed (next section).
 
 Gmail polling hardening is `COMPLETE / CLOSED / VERIFIED`.
 
@@ -547,22 +419,16 @@ No self-exclusion filter existed in the polling runtime.
 
 ## Resolution
 
-`PollGmailCommand::filterOutSelfEmails` compares each fetched message's `From:` header against the connected Gmail account email, case-insensitively, supporting both raw-email and display-name forms. Self-authored messages are skipped before dispatch, logged at INFO level, and the cursor advances past them so they are not re-fetched.
+`PollGmailCommand::filterOutSelfEmails` compares each fetched message's `From:` header against the connected Gmail account email, case-insensitively, supporting both raw-email and display-name forms. Self-authored messages are skipped before dispatch, logged at INFO level, and the cursor advances past them.
 
 ## Verification
 
-Live Gmail verification during a diagnostic session:
-
-- Two self-authored replies placed in INBOX by a controlled test workflow.
-- Next poll tick observed the two self-authored messages, filtered both, dispatched zero `RunWorkflowJob` instances.
-- Log evidence: `Gmail poll: skipped self-authored email` for both message IDs at the exact tick timestamp.
-- Cursor advanced past the self-authored messages.
-- No new executions created.
+Live Gmail verification during a diagnostic session confirmed the filter breaks the loop.
 
 ## Incident Gate
 
 - [x] Root cause identified.
-- [x] Mitigation implemented in `PollGmailCommand`.
+- [x] Mitigation implemented.
 - [x] Case-insensitive, display-name-aware comparison verified.
 - [x] Cursor advancement past skipped messages verified.
 - [x] Empirical live-Gmail verification complete.
@@ -579,31 +445,11 @@ Status: `COMPLETE / CLOSED / VERIFIED`.
 
 ## Goal
 
-Verify the public HTTP API surface for the entire workflow lifecycle — the surface the mobile / frontend client depends on — without relying only on internal action- or command-level tests.
+Verify the public HTTP API surface for the entire workflow lifecycle.
 
 ## Delivered
 
 - `tests/Feature/Audit/WorkflowApiAuditTest.php` — 26 tests / 105 assertions.
-
-Coverage:
-
-- Authentication (`POST /api/login`, `GET /api/user`)
-- Catalog (`GET /api/catalog`)
-- Connections (`GET /api/connections`)
-- Gmail labels (`GET /api/gmail/labels`)
-- Workflow CRUD, trigger upsert, step upsert, activate / pause / resume / delete / restore
-- Manual execution — empty body, valid payload, idempotency replay, reserved idempotency prefixes
-- `interval_minutes` full validation sweep (1, 5, 10, 1440, 0, -1, 1441, 5.5, "5", null, omitted)
-- Scheduler semantics — paused / draft / future-`next_poll_at` exclusion
-- Cross-user ownership matrix
-- Unauthenticated requests (401)
-- Negative testing with no partial DB mutation
-
-## Findings
-
-- Audit was read-only with respect to production code.
-- One confirmed bug was identified and closed in the same batch (Path A, below).
-- Documentation-only ambiguities were recorded for a future documentation batch.
 
 ## Audit Gate
 
@@ -625,34 +471,16 @@ Status: `COMPLETE / CLOSED / VERIFIED`.
 
 ## Bug
 
-The Catalog and Trigger responses serialized an empty `config` object as a JSON array (`"config": []`) instead of a JSON object (`"config": {}`), contradicting the mobile contract and the Swagger `CatalogAction` schema (both declare `config` as `type: object`).
+The Catalog and Trigger responses serialized an empty `config` object as a JSON array.
 
-## Fix — production files changed (only)
+## Fix — production files changed
 
 - `app/Modules/Integrations/Application/Services/CatalogProjector.php`
 - `app/Modules/Automation/Application/DTOs/TriggerData.php`
 
-Non-empty configs are byte-for-byte identical to before.
-
-## Fix — test file changed (only)
+## Fix — test file changed
 
 - `tests/Feature/Audit/WorkflowApiAuditTest.php`
-
-## Verification Results
-
-```text
-php artisan test --filter=WorkflowApiAudit
-→ 26 passed / 105 assertions
-
-php artisan test --filter=CatalogEndpointTest
-→ 13 passed / 67 assertions
-
-php artisan test --filter=WorkflowTriggerHttpTest
-→ 14 passed / 35 assertions
-
-composer test (full suite)
-→ 689 passed / 2068 assertions / 41.08s
-```
 
 ## Fix Gate
 
@@ -665,6 +493,94 @@ composer test (full suite)
 - [x] Full suite green after fix.
 
 Path A is `COMPLETE / CLOSED / VERIFIED`.
+
+---
+
+# Production Scheduler Hardening
+
+Post-Phase-8 hardening effort. Not a numbered phase.
+
+## Batch 1 — Foundation
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `TriggerCoordinator`
+- `TriggerStrategy` contract
+- `TriggerStrategyRegistry`
+- `SchedulerTickService` (global lock, tick orchestration)
+- `TickResult`, `StrategyResult` DTOs
+- `WorkflowRepository::listAllActiveWithTriggerDue()`
+- `config/internal_scheduler.php`
+
+No schema change.
+
+## Batch 2 — Schedule Strategy
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `ScheduleStrategy` with self-enforcing due-check (`nextPollAt <= $now`)
+- Idempotency key derived from `next_poll_at`
+- Synchronous `RunWorkflowAction::execute()`
+
+## Batch 3 — Gmail Poll Strategy
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `GmailPollStrategy` extracted from `PollGmailCommand`
+- Self-email filter preserved
+- Cursor and ordering semantics preserved
+- Synchronous `RunWorkflowAction::execute()` — no queue dispatch
+
+## Batch 4 — Internal Scheduler API
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `POST /api/internal/scheduler/tick`
+- `InternalSchedulerMiddleware` — bearer token, rate limit, misconfig detection
+- `InternalSchedulerTickController`
+- Global tick lock (`scheduler-tick-global`)
+- New env vars documented
+
+## Strategy Test Coverage
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `tests/Feature/Execution/ScheduleStrategyTest.php` — 3 tests / 14 assertions
+- `tests/Feature/Execution/GmailPollStrategyTest.php` — 3 tests / 13 assertions
+- `tests/Feature/Internal/SchedulerTickTest.php` — 6 tests / 17 assertions
+- `tests/Feature/Execution/TriggerCoordinatorTest.php` — 3 tests / 5 assertions
+
+## Scheduler Gate
+
+- [x] Trigger Coordinator exists.
+- [x] TriggerStrategy contract exists.
+- [x] `ScheduleStrategy` and `GmailPollStrategy` implemented.
+- [x] Internal tick endpoint implemented and authenticated.
+- [x] Global lock implemented.
+- [x] Due query is generic (no Gmail hardcoding).
+- [x] Execution path reaches `RunWorkflowAction`.
+- [x] No queue worker required for the new scheduler path.
+- [x] Strategy test coverage green.
+- [x] Full suite green at 704 tests / 2117 assertions.
+
+## Batches 5–8
+
+Status: `NOT STARTED`.
+
+- Batch 5 — Recovery generalization and stuck-`running` sweep.
+- Batch 6 — `next_poll_at` index optimization.
+- Batch 7 — Apps Script production setup and token configuration.
+- Batch 8 — Final production documentation and deployment checklist.
 
 ---
 
@@ -687,8 +603,9 @@ Path A is `COMPLETE / CLOSED / VERIFIED`.
 | Catalog batch close | 621 | 1893 |
 | Login API batch close | 632 | 1929 |
 | Post-Login full-suite (pre-Path-A) | 663 | 1963 |
-| Post-Path-A focused (3 files) | 53 focused | 207 focused |
-| **Post-Path-A full suite (current)** | **689** | **2068** |
+| Post-Path-A full suite | 689 | 2068 |
+| Post scheduler Batches 1–4 | 698 | 2090 |
+| **Post scheduler + strategy coverage (current)** | **704** | **2117** |
 
 ---
 
@@ -725,7 +642,7 @@ State Updated → Human Approval → Next Phase Unlocked
 
 No automatic transition.
 
-Post-Phase-8 branches recorded in this document do **not** open a new numbered phase. They are completed branches that ran under explicit authorization without being designated as a phase.
+Post-Phase-8 branches recorded in this document do **not** open a new numbered phase.
 
 ---
 

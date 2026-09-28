@@ -31,7 +31,7 @@ final class EloquentExecutionRepository implements ExecutionRepository
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
-            ->map(fn (ExecutionModel $m) => $this->toEntity($m))
+            ->map(fn(ExecutionModel $m) => $this->toEntity($m))
             ->all();
     }
 
@@ -101,7 +101,7 @@ final class EloquentExecutionRepository implements ExecutionRepository
             ->where('execution_id', $executionId)
             ->orderBy('position')
             ->get()
-            ->map(fn (ExecutionStepModel $m) => $this->stepToEntity($m))
+            ->map(fn(ExecutionStepModel $m) => $this->stepToEntity($m))
             ->all();
     }
 
@@ -139,7 +139,7 @@ final class EloquentExecutionRepository implements ExecutionRepository
             ->orderBy('id')
             ->limit($limit)
             ->get()
-            ->map(fn (ExecutionModel $m) => $this->toEntity($m))
+            ->map(fn(ExecutionModel $m) => $this->toEntity($m))
             ->all();
     }
 
@@ -162,6 +162,21 @@ final class EloquentExecutionRepository implements ExecutionRepository
             ]);
 
         return $affected === 1;
+    }
+    
+    public function markStaleRunningAsFailed(DateTimeImmutable $startedBefore): int
+    {
+        $now = now();
+
+        return ExecutionModel::query()
+            ->where('status', ExecutionStatus::Running->value)
+            ->where('started_at', '<', $startedBefore)
+            ->update([
+                'status' => ExecutionStatus::Failed->value,
+                'error_message' => 'Execution was marked as failed because it remained in "running" state past the stale threshold.',
+                'finished_at' => $now,
+                'updated_at' => $now,
+            ]);
     }
 
     private function toEntity(ExecutionModel $model): Execution

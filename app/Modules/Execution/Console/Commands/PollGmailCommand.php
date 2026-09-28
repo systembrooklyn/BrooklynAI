@@ -25,7 +25,13 @@ final class PollGmailCommand extends Command
 
     private const TRIGGER_KEY = 'new_email_received';
 
-    private const OVERLAP_SECONDS = 60;
+    // Overlap window covers the full external tick interval (5 minutes) plus
+    // a 1-minute safety margin. A shorter window would lose messages that were
+    // fetched but not executed if the tick process is terminated mid-run.
+    // Duplicate fetches are idempotent via the `gmail:{workflowId}:{messageId}`
+    // idempotency key, so the cost is only extra Gmail API calls, never
+    // duplicate executions.
+    private const OVERLAP_SECONDS = 360;
 
     private const DEFAULT_INTERVAL_MINUTES = 1;
 
@@ -62,7 +68,7 @@ final class PollGmailCommand extends Command
             $trigger = $pair['trigger'];
             $processed++;
 
-            $lock = Cache::lock('poll-trigger:'.$trigger->id, self::LOCK_SECONDS);
+            $lock = Cache::lock('poll-trigger:' . $trigger->id, self::LOCK_SECONDS);
             if (! $lock->get()) {
                 $skipped++;
                 $this->line(sprintf('Workflow %d: skipped (locked by another poller)', $workflow->id));
@@ -72,7 +78,13 @@ final class PollGmailCommand extends Command
 
             try {
                 $outcome = $this->processWorkflow(
-                    $workflow, $trigger, $executions, $fetch, $connections, $workflows, $now,
+                    $workflow,
+                    $trigger,
+                    $executions,
+                    $fetch,
+                    $connections,
+                    $workflows,
+                    $now,
                 );
 
                 if ($outcome === 'executed') {
@@ -88,7 +100,7 @@ final class PollGmailCommand extends Command
                     continue;
                 }
                 throw $e;
-            } catch (GoogleCredentialsUnavailableException|ConnectionNotFoundException $e) {
+            } catch (GoogleCredentialsUnavailableException | ConnectionNotFoundException $e) {
                 $skipped++;
                 $this->warn(sprintf('Workflow %d: %s', $workflow->id, $e->getMessage()));
             } finally {
@@ -169,14 +181,14 @@ final class PollGmailCommand extends Command
             return $c !== 0 ? $c : strcmp((string) $a['message_id'], (string) $b['message_id']);
         });
 
-        $rateKey = 'workflow-exec:'.$workflow->id;
+        $rateKey = 'workflow-exec:' . $workflow->id;
         $rateLimit = (int) config('automation.execution_rate_limit_per_minute', self::DEFAULT_RATE_LIMIT);
 
         $dispatched = 0;
 
         foreach ($payloads as $payload) {
             $messageId = (string) $payload['message_id'];
-            $idempotencyKey = 'gmail:'.$workflow->id.':'.$messageId;
+            $idempotencyKey = 'gmail:' . $workflow->id . ':' . $messageId;
 
             if ($executions->findByIdempotencyKey((int) $workflow->id, $idempotencyKey) !== null) {
                 continue;
@@ -294,7 +306,7 @@ final class PollGmailCommand extends Command
             $interval = self::DEFAULT_INTERVAL_MINUTES;
         }
 
-        return $now->modify('+'.$interval.' minutes');
+        return $now->modify('+' . $interval . ' minutes');
     }
 
     private function extractLabelIds(WorkflowTrigger $trigger): ?array

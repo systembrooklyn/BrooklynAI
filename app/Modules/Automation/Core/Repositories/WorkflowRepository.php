@@ -57,4 +57,9 @@ interface WorkflowRepository
     public function deleteStep(WorkflowStep $step): void;
 
     public function deleteStepsForWorkflow(int $workflowId): void;
+
+    /**
+     * @return array<int, array{workflow: Workflow, trigger: WorkflowTrigger}>
+     */
+    public function listAllActiveWithTriggerDue(DateTimeImmutable $now, int $limit = 50): array;
 }
