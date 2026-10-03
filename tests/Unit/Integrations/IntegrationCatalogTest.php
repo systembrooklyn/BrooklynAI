@@ -89,11 +89,24 @@ class IntegrationCatalogTest extends TestCase
 
         $this->assertNotNull($gmail);
 
-        $actionKeys = array_map(static fn ($a) => $a->key, $gmail->actions);
+        $actionKeys = array_map(static fn($a) => $a->key, $gmail->actions);
         sort($actionKeys);
-        $this->assertSame(['create_draft', 'reply_to_email', 'send_email'], $actionKeys);
-
-        $triggerKeys = array_map(static fn ($t) => $t->key, $gmail->triggers);
+        $this->assertSame(
+            [
+                'add_label',
+                'archive',
+                'create_draft',
+                'create_label',
+                'mark_as_read',
+                'mark_as_unread',
+                'remove_label',
+                'reply_to_email',
+                'send_email',
+                'trash',
+            ],
+            $actionKeys,
+        );
+        $triggerKeys = array_map(static fn($t) => $t->key, $gmail->triggers);
         $this->assertSame(['new_email_received'], $triggerKeys);
 
         $this->assertSame('poll', $gmail->triggers[0]->strategy->value);

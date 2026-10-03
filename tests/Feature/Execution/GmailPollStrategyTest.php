@@ -61,7 +61,7 @@ class GmailPollStrategyTest extends TestCase
         ]);
     }
 
-    private function makeWorkflow(string $connectionEmail, int $pollCursor): array
+    private function makeWorkflow(string $connectionEmail, int $pollCursor, array $triggerConfig = []): array
     {
         $user = User::factory()->create();
 
@@ -86,7 +86,7 @@ class GmailPollStrategyTest extends TestCase
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
             'strategy' => 'poll',
-            'config' => [],
+            'config' => $triggerConfig,
             'interval_minutes' => 5,
             'poll_cursor' => $pollCursor,
             'next_poll_at' => null,
@@ -168,7 +168,6 @@ class GmailPollStrategyTest extends TestCase
         );
 
         $triggerModel->refresh();
-        // Cursor must still advance past the skipped self-email.
         $this->assertGreaterThan($initialCursor, (int) $triggerModel->poll_cursor);
     }
 
@@ -202,7 +201,6 @@ class GmailPollStrategyTest extends TestCase
             'First process should create exactly one execution.',
         );
 
-        // Rewind the cursor to simulate the same message being returned again.
         $triggerModel->update(['poll_cursor' => $initialCursor]);
 
         $triggerEntity2 = $repo->findTriggerForWorkflow((int) $workflow->id);
@@ -212,6 +210,35 @@ class GmailPollStrategyTest extends TestCase
             1,
             ExecutionModel::where('workflow_id', $workflow->id)->count(),
             'Second process with the same message must not create a duplicate execution.',
+        );
+    }
+
+    public function test_strategy_composes_gmail_query_from_trigger_config(): void
+    {
+        $now = new DateTimeImmutable;
+        $initialCursor = $now->getTimestamp() - 120;
+
+        [$user, $workflow] = $this->makeWorkflow('owner@example.com', $initialCursor, [
+            'label_id' => 'INBOX',
+            'from' => 'user@example.com',
+            'subject' => 'Invoice paid',
+            'has_attachment' => true,
+            'query' => 'is:unread',
+        ]);
+
+        $this->reader->listMessageIdsReturn = [];
+
+        $repo = app(WorkflowRepository::class);
+        $workflowEntity = $repo->findForUser((int) $user->id, (int) $workflow->id);
+        $triggerEntity = $repo->findTriggerForWorkflow((int) $workflow->id);
+
+        app(GmailPollStrategy::class)->process($workflowEntity, $triggerEntity, $now);
+
+        $this->assertCount(1, $this->reader->listCalls);
+        $this->assertSame(['INBOX'], $this->reader->listCalls[0]['labelIds']);
+        $this->assertSame(
+            'from:user@example.com subject:"Invoice paid" has:attachment is:unread',
+            $this->reader->listCalls[0]['query'],
         );
     }
 }

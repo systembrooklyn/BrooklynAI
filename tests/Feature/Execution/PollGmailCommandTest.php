@@ -52,7 +52,7 @@ class PollGmailCommandTest extends TestCase
     ): int {
         $workflow = WorkflowModel::create([
             'user_id' => $user->id,
-            'name' => 'W-' . uniqid(),
+            'name' => 'W-'.uniqid(),
             'status' => $status,
         ]);
 
@@ -82,7 +82,7 @@ class PollGmailCommandTest extends TestCase
 
         return new GoogleGmailMessage(array_merge([
             'id' => $id,
-            'threadId' => 'thread-' . $id,
+            'threadId' => 'thread-'.$id,
             'internalDate' => (string) $internalDateMs,
             'labelIds' => ['INBOX'],
             'snippet' => 'Snippet',
@@ -180,6 +180,7 @@ class PollGmailCommandTest extends TestCase
         $this->artisan('workflows:poll-gmail')->assertExitCode(0);
 
         $this->assertSame([], $this->reader->listCalls[0]['labelIds']);
+        $this->assertNull($this->reader->listCalls[0]['query']);
     }
 
     public function test_subsequent_tick_includes_label_id_filter_when_configured(): void
@@ -215,6 +216,88 @@ class PollGmailCommandTest extends TestCase
     }
 
     // -------------------------------------------------------------------
+    // Batch 2 — Filter composition
+    // -------------------------------------------------------------------
+
+    public function test_from_filter_is_composed_into_query(): void
+    {
+        $user = User::factory()->create();
+        $this->seedWorkflow($user, pollCursor: 1000, triggerConfig: [
+            'from' => 'user@example.com',
+        ]);
+
+        $this->artisan('workflows:poll-gmail')->assertExitCode(0);
+
+        $this->assertSame('from:user@example.com', $this->reader->listCalls[0]['query']);
+    }
+
+    public function test_subject_filter_with_spaces_is_quoted(): void
+    {
+        $user = User::factory()->create();
+        $this->seedWorkflow($user, pollCursor: 1000, triggerConfig: [
+            'subject' => 'Invoice paid',
+        ]);
+
+        $this->artisan('workflows:poll-gmail')->assertExitCode(0);
+
+        $this->assertSame('subject:"Invoice paid"', $this->reader->listCalls[0]['query']);
+    }
+
+    public function test_has_attachment_filter_adds_query_token(): void
+    {
+        $user = User::factory()->create();
+        $this->seedWorkflow($user, pollCursor: 1000, triggerConfig: [
+            'has_attachment' => true,
+        ]);
+
+        $this->artisan('workflows:poll-gmail')->assertExitCode(0);
+
+        $this->assertSame('has:attachment', $this->reader->listCalls[0]['query']);
+    }
+
+    public function test_free_form_query_is_appended_to_gmail_query(): void
+    {
+        $user = User::factory()->create();
+        $this->seedWorkflow($user, pollCursor: 1000, triggerConfig: [
+            'query' => 'is:unread larger:5M',
+        ]);
+
+        $this->artisan('workflows:poll-gmail')->assertExitCode(0);
+
+        $this->assertSame('is:unread larger:5M', $this->reader->listCalls[0]['query']);
+    }
+
+    public function test_all_filters_combined(): void
+    {
+        $user = User::factory()->create();
+        $this->seedWorkflow($user, pollCursor: 1000, triggerConfig: [
+            'label_id' => 'INBOX',
+            'from' => 'user@example.com',
+            'subject' => 'Invoice paid',
+            'has_attachment' => true,
+            'query' => 'is:unread',
+        ]);
+
+        $this->artisan('workflows:poll-gmail')->assertExitCode(0);
+
+        $this->assertSame(['INBOX'], $this->reader->listCalls[0]['labelIds']);
+        $this->assertSame(
+            'from:user@example.com subject:"Invoice paid" has:attachment is:unread',
+            $this->reader->listCalls[0]['query'],
+        );
+    }
+
+    public function test_no_filters_produces_null_query(): void
+    {
+        $user = User::factory()->create();
+        $this->seedWorkflow($user, pollCursor: 1000, triggerConfig: []);
+
+        $this->artisan('workflows:poll-gmail')->assertExitCode(0);
+
+        $this->assertNull($this->reader->listCalls[0]['query']);
+    }
+
+    // -------------------------------------------------------------------
     // Deterministic ordering
     // -------------------------------------------------------------------
 
@@ -238,7 +321,7 @@ class PollGmailCommandTest extends TestCase
             ->get();
 
         $messageIds = $executions
-            ->map(static fn($e) => $e->trigger_payload['message_id'] ?? null)
+            ->map(static fn ($e) => $e->trigger_payload['message_id'] ?? null)
             ->filter()
             ->values()
             ->all();
@@ -276,7 +359,7 @@ class PollGmailCommandTest extends TestCase
 
         $this->assertDatabaseHas('executions', [
             'workflow_id' => $id,
-            'idempotency_key' => 'gmail:' . $id . ':m-abc',
+            'idempotency_key' => 'gmail:'.$id.':m-abc',
         ]);
     }
 
@@ -327,8 +410,6 @@ class PollGmailCommandTest extends TestCase
 
         $this->artisan('workflows:poll-gmail')->assertExitCode(0);
 
-        // Production behavior: next cursor = maxSeenSeconds + 1.
-        // Max internalDate is 1_700_000_010_500 ms => 1_700_000_010 s => +1.
         $this->assertSame(1_700_000_011, $this->cursorOf($id));
     }
 
@@ -399,7 +480,6 @@ class PollGmailCommandTest extends TestCase
 
         $this->artisan('workflows:poll-gmail')->assertExitCode(0);
 
-        // Production behavior: next cursor = maxSeenSeconds + 1.
         $this->assertSame(1_700_000_011, $this->cursorOf($id));
     }
 
@@ -471,7 +551,6 @@ class PollGmailCommandTest extends TestCase
         $this->artisan('workflows:poll-gmail')->assertExitCode(0);
 
         $this->assertSame(1000, $this->cursorOf($failing));
-        // Production behavior: next cursor = maxSeenSeconds + 1.
         $this->assertSame(1_700_000_001, $this->cursorOf($ok));
     }
 
@@ -529,7 +608,7 @@ class PollGmailCommandTest extends TestCase
             1,
             ExecutionModel::query()
                 ->where('workflow_id', $id)
-                ->where('idempotency_key', 'gmail:' . $id . ':m-1')
+                ->where('idempotency_key', 'gmail:'.$id.':m-1')
                 ->count()
         );
     }

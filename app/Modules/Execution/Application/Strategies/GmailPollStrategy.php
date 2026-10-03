@@ -19,15 +19,18 @@ use App\Modules\Execution\Core\Repositories\ExecutionRepository;
 use App\Modules\Integrations\Application\Actions\FetchGmailTriggerMessagesAction;
 use App\Modules\Integrations\Application\DTOs\FetchGmailTriggerMessagesInput;
 use App\Modules\Integrations\Core\Exceptions\GmailProviderException;
+use App\Modules\Integrations\Infrastructure\Google\Gmail\GmailTriggerQueryComposer;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Log;
 
 final class GmailPollStrategy implements TriggerStrategy
 {
     private const STRATEGY_KEY = 'poll';
+
     private const INTEGRATION_KEY = 'google.gmail';
+
     private const TRIGGER_KEY = 'new_email_received';
-    
+
     // Overlap window covers the full external tick interval (5 minutes) plus
     // a 1-minute safety margin. A shorter window would lose messages that were
     // fetched but not executed if the tick process is terminated mid-run.
@@ -35,6 +38,7 @@ final class GmailPollStrategy implements TriggerStrategy
     // idempotency key, so the cost is only extra Gmail API calls, never
     // duplicate executions.
     private const OVERLAP_SECONDS = 360;
+
     private const DEFAULT_INTERVAL_MINUTES = 5;
 
     public function __construct(
@@ -43,6 +47,7 @@ final class GmailPollStrategy implements TriggerStrategy
         private readonly ExecutionRepository $executions,
         private readonly FetchGmailTriggerMessagesAction $fetch,
         private readonly RunWorkflowAction $runWorkflow,
+        private readonly GmailTriggerQueryComposer $queryComposer,
     ) {}
 
     public function strategyKey(): string
@@ -59,10 +64,8 @@ final class GmailPollStrategy implements TriggerStrategy
             return StrategyResult::skipped('missing_workflow_id');
         }
 
-        if (
-            $trigger->integrationKey !== self::INTEGRATION_KEY
-            || $trigger->triggerKey !== self::TRIGGER_KEY
-        ) {
+        if ($trigger->integrationKey !== self::INTEGRATION_KEY
+            || $trigger->triggerKey !== self::TRIGGER_KEY) {
             return StrategyResult::skipped('unsupported_trigger');
         }
 
@@ -72,6 +75,7 @@ final class GmailPollStrategy implements TriggerStrategy
 
         if ($trigger->pollCursor === null) {
             $this->advanceState($trigger, $now, null);
+
             return StrategyResult::skipped('cursor_initialized');
         }
 
@@ -79,6 +83,8 @@ final class GmailPollStrategy implements TriggerStrategy
         if ($labelIds === null) {
             return StrategyResult::skipped('malformed_label_id');
         }
+
+        $query = $this->queryComposer->compose($trigger->config);
 
         $after = max($trigger->pollCursor - self::OVERLAP_SECONDS, 0);
 
@@ -88,6 +94,7 @@ final class GmailPollStrategy implements TriggerStrategy
                 connectionId: $trigger->connectionId,
                 afterEpochSeconds: $after,
                 labelIds: $labelIds,
+                query: $query,
             ));
         } catch (GmailProviderException $e) {
             if ($e->retryable) {
@@ -95,7 +102,7 @@ final class GmailPollStrategy implements TriggerStrategy
             }
 
             throw $e;
-        } catch (GoogleCredentialsUnavailableException | ConnectionNotFoundException) {
+        } catch (GoogleCredentialsUnavailableException|ConnectionNotFoundException) {
             return StrategyResult::skipped('credentials_unavailable');
         }
 
@@ -108,11 +115,13 @@ final class GmailPollStrategy implements TriggerStrategy
 
         if (empty($payloads)) {
             $this->advanceState($trigger, $now, $maxSeenSeconds);
+
             return StrategyResult::skipped('no_new_messages');
         }
 
         usort($payloads, function (array $a, array $b): int {
             $c = ((int) $a['received_at_epoch_ms']) <=> ((int) $b['received_at_epoch_ms']);
+
             return $c !== 0 ? $c : strcmp((string) $a['message_id'], (string) $b['message_id']);
         });
 
@@ -120,7 +129,7 @@ final class GmailPollStrategy implements TriggerStrategy
 
         foreach ($payloads as $payload) {
             $messageId = (string) $payload['message_id'];
-            $idempotencyKey = 'gmail:' . $workflow->id . ':' . $messageId;
+            $idempotencyKey = 'gmail:'.$workflow->id.':'.$messageId;
 
             if ($this->executions->findByIdempotencyKey((int) $workflow->id, $idempotencyKey) !== null) {
                 continue;
@@ -135,7 +144,7 @@ final class GmailPollStrategy implements TriggerStrategy
                     triggerSource: 'poll',
                 ));
                 $executed++;
-            } catch (WorkflowNotFoundException | WorkflowNotExecutableException) {
+            } catch (WorkflowNotFoundException|WorkflowNotExecutableException) {
                 continue;
             } catch (ExecutionAlreadyRunningException) {
                 break;
@@ -170,7 +179,7 @@ final class GmailPollStrategy implements TriggerStrategy
             createdAt: $trigger->createdAt,
             updatedAt: new DateTimeImmutable,
             pollCursor: $cursor,
-            nextPollAt: $now->modify('+' . $interval . ' minutes'),
+            nextPollAt: $now->modify('+'.$interval.' minutes'),
         );
 
         $this->workflows->saveTrigger($updated);
@@ -188,6 +197,7 @@ final class GmailPollStrategy implements TriggerStrategy
                 $max = $seen;
             }
         }
+
         return $max;
     }
 
@@ -207,6 +217,7 @@ final class GmailPollStrategy implements TriggerStrategy
                     'workflow_id' => $workflow->id,
                     'message_id' => $payload['message_id'] ?? null,
                 ]);
+
                 continue;
             }
             $kept[] = $payload;
@@ -224,10 +235,12 @@ final class GmailPollStrategy implements TriggerStrategy
 
         if (preg_match('/<([^>]+)>/', $header, $m) === 1) {
             $email = strtolower(trim($m[1]));
+
             return filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? $email : null;
         }
 
         $email = strtolower($header);
+
         return filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? $email : null;
     }
 

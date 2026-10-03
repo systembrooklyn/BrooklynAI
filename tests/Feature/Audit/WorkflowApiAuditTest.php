@@ -33,7 +33,7 @@ class WorkflowApiAuditTest extends TestCase
         $connection = ConnectionModel::create([
             'user_id' => $user->id,
             'provider' => 'google',
-            'external_account_id' => 'audit-' . uniqid(),
+            'external_account_id' => 'audit-'.uniqid(),
             'access_token' => 'access',
             'refresh_token' => 'refresh',
             'email' => $user->email,
@@ -50,7 +50,7 @@ class WorkflowApiAuditTest extends TestCase
      */
     private function pluckWorkflowIds(array $pairs): array
     {
-        return array_map(static fn($p) => (int) $p['workflow']->id, $pairs);
+        return array_map(static fn ($p) => (int) $p['workflow']->id, $pairs);
     }
 
     // -------------------------------------------------------------------
@@ -66,8 +66,6 @@ class WorkflowApiAuditTest extends TestCase
 
         $response->assertStatus(200);
 
-        // Mobile contract §1.2 documents this as boolean `true`.
-        // AUDIT RESULT: PASS — the endpoint serializes as JSON boolean, not integer.
         $this->assertIsBool(
             $response->json('data.has_bot_access'),
             'GET /api/user must serialize has_bot_access as a JSON boolean, not an integer.',
@@ -79,11 +77,10 @@ class WorkflowApiAuditTest extends TestCase
     // -------------------------------------------------------------------
 
     /**
-     * AUDIT RESULT: PASS — Bug P2/P3 resolved.
+     * AUDIT RESULT: PASS.
      *
-     * Empty action config must serialize as a JSON object `{}`, not a JSON array
-     * `[]`. This matches the mobile contract §4.4 and the Swagger `CatalogAction`
-     * schema (both declare `config` as `type: object`).
+     * Actions with no configurable fields (e.g. any Calendar action) must
+     * serialize their config as a JSON object `{}`, not a JSON array `[]`.
      */
     public function test_catalog_empty_action_config_serializes_as_json_object(): void
     {
@@ -95,12 +92,12 @@ class WorkflowApiAuditTest extends TestCase
 
         $raw = $response->getContent();
 
-        // The reply_to_email action is declared with no configurable fields.
-        $needle = '"action_key":"reply_to_email"';
+        // `create_event` (Calendar) is declared with no configurable fields.
+        $needle = '"action_key":"create_event"';
         $pos = strpos($raw, $needle);
         $this->assertNotFalse(
             $pos,
-            'Reply_to_email action should appear in the raw catalog JSON.',
+            'create_event action should appear in the raw catalog JSON.',
         );
 
         $window = substr($raw, $pos, 250);
@@ -118,13 +115,10 @@ class WorkflowApiAuditTest extends TestCase
         );
     }
 
-
     /**
-     * AUDIT RESULT: PASS — Bug P3 resolved.
+     * AUDIT RESULT: PASS.
      *
-     * A trigger upserted with an empty config must return `"config":{}` in the
-     * raw JSON body, matching the mobile contract §5.7. Non-empty configs must
-     * still serialize normally as `{"key":value,...}`.
+     * A trigger upserted with an empty config must return `"config":{}`.
      */
     public function test_trigger_config_serializes_as_json_object_when_empty(): void
     {
@@ -134,8 +128,7 @@ class WorkflowApiAuditTest extends TestCase
         $workflowId = $this->postJson('/api/workflows', ['name' => 'Trigger config shape'])
             ->json('data.id');
 
-        // Empty config path.
-        $emptyResponse = $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $emptyResponse = $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
@@ -155,8 +148,7 @@ class WorkflowApiAuditTest extends TestCase
             'Empty trigger config must not serialize as a JSON array [].',
         );
 
-        // Non-empty config path — must remain a normal object.
-        $populatedResponse = $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $populatedResponse = $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
@@ -171,30 +163,16 @@ class WorkflowApiAuditTest extends TestCase
             'Non-empty trigger config must serialize as a JSON object with its keys.',
         );
     }
+
     // -------------------------------------------------------------------
     // 3. Full lifecycle through HTTP
     // -------------------------------------------------------------------
 
-    /**
-     * AUDIT FINDING (Contract ambiguity P4-ish):
-     *
-     * `RestoreWorkflowAction` calls `WorkflowRepository::restore()`, which only
-     * clears `deleted_at`. It does NOT modify the `status` column. So a workflow
-     * deleted while `paused` comes back `paused`; a workflow deleted while
-     * `active` comes back `active`.
-     *
-     * The mobile contract §5.6 says restore "does not auto-activate". This is
-     * technically true (no activation logic runs), but misleading — if the
-     * workflow was active before delete, it returns active after restore.
-     *
-     * This test asserts BOTH paths so the actual behavior is documented.
-     */
     public function test_full_workflow_lifecycle_through_http(): void
     {
         [$user, $connection] = $this->userWithConnection();
         Sanctum::actingAs($user);
 
-        // --- Create ---
         $create = $this->postJson('/api/workflows', ['name' => 'Audit lifecycle']);
         $create->assertStatus(201);
         $workflowId = $create->json('data.id');
@@ -206,15 +184,13 @@ class WorkflowApiAuditTest extends TestCase
             'status' => 'draft',
         ]);
 
-        // --- Read back ---
-        $show = $this->getJson('/api/workflows/' . $workflowId);
+        $show = $this->getJson('/api/workflows/'.$workflowId);
         $show->assertStatus(200);
         $this->assertSame('draft', $show->json('data.status'));
         $this->assertNull($show->json('data.trigger'));
         $this->assertSame([], $show->json('data.steps'));
 
-        // --- Update ---
-        $update = $this->putJson('/api/workflows/' . $workflowId, [
+        $update = $this->putJson('/api/workflows/'.$workflowId, [
             'name' => 'Audit lifecycle (renamed)',
             'description' => 'updated',
         ]);
@@ -225,8 +201,7 @@ class WorkflowApiAuditTest extends TestCase
             'description' => 'updated',
         ]);
 
-        // --- Trigger ---
-        $trigger = $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $trigger = $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
@@ -242,8 +217,7 @@ class WorkflowApiAuditTest extends TestCase
             'interval_minutes' => 5,
         ]);
 
-        // --- Step ---
-        $step = $this->postJson('/api/workflows/' . $workflowId . '/steps', [
+        $step = $this->postJson('/api/workflows/'.$workflowId.'/steps', [
             'integration_key' => 'google.gmail',
             'action_key' => 'send_email',
             'connection_id' => $connection->id,
@@ -256,59 +230,51 @@ class WorkflowApiAuditTest extends TestCase
         $step->assertStatus(201);
         $this->assertSame(1, $step->json('data.position'));
 
-        // --- Activate ---
-        $activate = $this->postJson('/api/workflows/' . $workflowId . '/activate');
+        $activate = $this->postJson('/api/workflows/'.$workflowId.'/activate');
         $activate->assertStatus(200);
         $this->assertDatabaseHas('workflows', [
             'id' => $workflowId,
             'status' => 'active',
         ]);
 
-        // --- Pause ---
-        $pause = $this->postJson('/api/workflows/' . $workflowId . '/pause');
+        $pause = $this->postJson('/api/workflows/'.$workflowId.'/pause');
         $pause->assertStatus(200);
         $this->assertDatabaseHas('workflows', [
             'id' => $workflowId,
             'status' => 'paused',
         ]);
 
-        // --- Delete while PAUSED, then restore ---
-        // Documents that restore preserves the pre-delete status (paused).
-        $this->deleteJson('/api/workflows/' . $workflowId)->assertStatus(200);
+        $this->deleteJson('/api/workflows/'.$workflowId)->assertStatus(200);
         $this->assertSoftDeleted('workflows', ['id' => $workflowId]);
 
-        $this->postJson('/api/workflows/' . $workflowId . '/restore')->assertStatus(200);
+        $this->postJson('/api/workflows/'.$workflowId.'/restore')->assertStatus(200);
         $this->assertNotSoftDeleted('workflows', ['id' => $workflowId]);
 
-        $afterPausedRestore = $this->getJson('/api/workflows/' . $workflowId);
+        $afterPausedRestore = $this->getJson('/api/workflows/'.$workflowId);
         $this->assertSame(
             'paused',
             $afterPausedRestore->json('data.status'),
             'Restore must preserve the status that existed before delete.',
         );
 
-        // --- Resume via /activate ---
-        $resume = $this->postJson('/api/workflows/' . $workflowId . '/activate');
+        $resume = $this->postJson('/api/workflows/'.$workflowId.'/activate');
         $resume->assertStatus(200);
         $this->assertDatabaseHas('workflows', [
             'id' => $workflowId,
             'status' => 'active',
         ]);
 
-        // --- Delete while ACTIVE, then restore ---
-        // Documents that restore preserves the pre-delete status (active).
-        $this->deleteJson('/api/workflows/' . $workflowId)->assertStatus(200);
+        $this->deleteJson('/api/workflows/'.$workflowId)->assertStatus(200);
         $this->assertSoftDeleted('workflows', ['id' => $workflowId]);
 
-        $this->postJson('/api/workflows/' . $workflowId . '/restore')->assertStatus(200);
+        $this->postJson('/api/workflows/'.$workflowId.'/restore')->assertStatus(200);
         $this->assertNotSoftDeleted('workflows', ['id' => $workflowId]);
 
-        $afterActiveRestore = $this->getJson('/api/workflows/' . $workflowId);
+        $afterActiveRestore = $this->getJson('/api/workflows/'.$workflowId);
         $this->assertSame(
             'active',
             $afterActiveRestore->json('data.status'),
-            'Restore preserves the pre-delete status. A workflow deleted while active '
-                . 'comes back active. This is the actual behavior — see audit note on P4.',
+            'Restore preserves the pre-delete status.',
         );
     }
 
@@ -322,20 +288,19 @@ class WorkflowApiAuditTest extends TestCase
         Sanctum::actingAs($user);
 
         $workflowId = $this->postJson('/api/workflows', ['name' => 'Empty body'])->json('data.id');
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
         ]);
-        $this->postJson('/api/workflows/' . $workflowId . '/steps', [
+        $this->postJson('/api/workflows/'.$workflowId.'/steps', [
             'integration_key' => 'google.gmail',
             'action_key' => 'send_email',
             'connection_id' => $connection->id,
             'config' => ['to' => 'fixed@example.com', 'subject' => 'S', 'body' => 'B'],
         ]);
 
-        // Draft is executable per RunWorkflowAction. We only assert the request was accepted.
-        $response = $this->postJson('/api/workflows/' . $workflowId . '/execute', []);
+        $response = $this->postJson('/api/workflows/'.$workflowId.'/execute', []);
 
         $this->assertContains($response->status(), [200, 201, 409, 500]);
         $this->assertIsArray($response->json());
@@ -347,13 +312,12 @@ class WorkflowApiAuditTest extends TestCase
         Sanctum::actingAs($user);
 
         $workflowId = $this->postJson('/api/workflows', ['name' => 'Idem'])->json('data.id');
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
         ]);
 
-        // Seed a completed execution to avoid invoking Gmail.
         ExecutionModel::create([
             'workflow_id' => $workflowId,
             'user_id' => $user->id,
@@ -363,10 +327,10 @@ class WorkflowApiAuditTest extends TestCase
             'idempotency_key' => 'audit-key-1',
         ]);
 
-        $first = $this->postJson('/api/workflows/' . $workflowId . '/execute', [
+        $first = $this->postJson('/api/workflows/'.$workflowId.'/execute', [
             'idempotency_key' => 'audit-key-1',
         ]);
-        $first->assertStatus(200); // replay
+        $first->assertStatus(200);
 
         $count = ExecutionModel::where('workflow_id', $workflowId)
             ->where('idempotency_key', 'audit-key-1')
@@ -381,14 +345,14 @@ class WorkflowApiAuditTest extends TestCase
         Sanctum::actingAs($user);
 
         $workflowId = $this->postJson('/api/workflows', ['name' => 'Reserved'])->json('data.id');
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
         ]);
 
         foreach (['schedule:anything', 'gmail:8:m-abc'] as $bad) {
-            $response = $this->postJson('/api/workflows/' . $workflowId . '/execute', [
+            $response = $this->postJson('/api/workflows/'.$workflowId.'/execute', [
                 'idempotency_key' => $bad,
             ]);
             $response->assertStatus(422);
@@ -406,7 +370,7 @@ class WorkflowApiAuditTest extends TestCase
         [$user, $connection] = $this->userWithConnection();
         Sanctum::actingAs($user);
 
-        $workflowId = $this->postJson('/api/workflows', ['name' => 'Interval ' . $label])->json('data.id');
+        $workflowId = $this->postJson('/api/workflows', ['name' => 'Interval '.$label])->json('data.id');
 
         $body = [
             'integration_key' => 'google.gmail',
@@ -417,7 +381,7 @@ class WorkflowApiAuditTest extends TestCase
             $body['interval_minutes'] = $value;
         }
 
-        $response = $this->putJson('/api/workflows/' . $workflowId . '/trigger', $body);
+        $response = $this->putJson('/api/workflows/'.$workflowId.'/trigger', $body);
 
         if ($shouldPass) {
             $response->assertStatus(200);
@@ -454,13 +418,13 @@ class WorkflowApiAuditTest extends TestCase
         Sanctum::actingAs($user);
 
         $workflowId = $this->postJson('/api/workflows', ['name' => 'Paused'])->json('data.id');
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
         ]);
-        $this->postJson('/api/workflows/' . $workflowId . '/activate');
-        $this->postJson('/api/workflows/' . $workflowId . '/pause');
+        $this->postJson('/api/workflows/'.$workflowId.'/activate');
+        $this->postJson('/api/workflows/'.$workflowId.'/pause');
 
         $this->assertDatabaseHas('workflows', ['id' => $workflowId, 'status' => 'paused']);
 
@@ -484,13 +448,12 @@ class WorkflowApiAuditTest extends TestCase
         Sanctum::actingAs($user);
 
         $workflowId = $this->postJson('/api/workflows', ['name' => 'Draft'])->json('data.id');
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
         ]);
 
-        // Confirm workflow is still draft.
         $this->assertDatabaseHas('workflows', ['id' => $workflowId, 'status' => 'draft']);
 
         $repo = app(WorkflowRepository::class);
@@ -513,17 +476,16 @@ class WorkflowApiAuditTest extends TestCase
         Sanctum::actingAs($user);
 
         $workflowId = $this->postJson('/api/workflows', ['name' => 'Future'])->json('data.id');
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connection->id,
         ]);
-        $this->postJson('/api/workflows/' . $workflowId . '/activate');
+        $this->postJson('/api/workflows/'.$workflowId.'/activate');
 
         WorkflowTriggerModel::where('workflow_id', $workflowId)
             ->update(['next_poll_at' => (new \DateTimeImmutable)->modify('+1 hour')]);
 
-        // Confirm workflow is active but not due.
         $this->assertDatabaseHas('workflows', ['id' => $workflowId, 'status' => 'active']);
 
         $repo = app(WorkflowRepository::class);
@@ -551,12 +513,12 @@ class WorkflowApiAuditTest extends TestCase
 
         Sanctum::actingAs($owner);
         $workflowId = $this->postJson('/api/workflows', ['name' => 'Owned by A'])->json('data.id');
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
             'connection_id' => $connA->id,
         ]);
-        $this->postJson('/api/workflows/' . $workflowId . '/steps', [
+        $this->postJson('/api/workflows/'.$workflowId.'/steps', [
             'integration_key' => 'google.gmail',
             'action_key' => 'send_email',
             'connection_id' => $connA->id,
@@ -573,29 +535,29 @@ class WorkflowApiAuditTest extends TestCase
 
         Sanctum::actingAs($attacker);
 
-        $this->getJson('/api/workflows/' . $workflowId)->assertStatus(404);
-        $this->putJson('/api/workflows/' . $workflowId, ['name' => 'Hijacked'])->assertStatus(404);
-        $this->deleteJson('/api/workflows/' . $workflowId)->assertStatus(404);
-        $this->postJson('/api/workflows/' . $workflowId . '/restore')->assertStatus(404);
-        $this->postJson('/api/workflows/' . $workflowId . '/activate')->assertStatus(404);
-        $this->postJson('/api/workflows/' . $workflowId . '/pause')->assertStatus(404);
-        $this->postJson('/api/workflows/' . $workflowId . '/execute')->assertStatus(404);
-        $this->getJson('/api/workflows/' . $workflowId . '/executions')->assertStatus(404);
-        $this->getJson('/api/executions/' . $execution->id)->assertStatus(404);
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->getJson('/api/workflows/'.$workflowId)->assertStatus(404);
+        $this->putJson('/api/workflows/'.$workflowId, ['name' => 'Hijacked'])->assertStatus(404);
+        $this->deleteJson('/api/workflows/'.$workflowId)->assertStatus(404);
+        $this->postJson('/api/workflows/'.$workflowId.'/restore')->assertStatus(404);
+        $this->postJson('/api/workflows/'.$workflowId.'/activate')->assertStatus(404);
+        $this->postJson('/api/workflows/'.$workflowId.'/pause')->assertStatus(404);
+        $this->postJson('/api/workflows/'.$workflowId.'/execute')->assertStatus(404);
+        $this->getJson('/api/workflows/'.$workflowId.'/executions')->assertStatus(404);
+        $this->getJson('/api/executions/'.$execution->id)->assertStatus(404);
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
         ])->assertStatus(404);
-        $this->deleteJson('/api/workflows/' . $workflowId . '/trigger')->assertStatus(404);
-        $this->postJson('/api/workflows/' . $workflowId . '/steps', [
+        $this->deleteJson('/api/workflows/'.$workflowId.'/trigger')->assertStatus(404);
+        $this->postJson('/api/workflows/'.$workflowId.'/steps', [
             'integration_key' => 'google.gmail',
             'action_key' => 'send_email',
         ])->assertStatus(404);
-        $this->putJson('/api/workflows/' . $workflowId . '/steps/1', [
+        $this->putJson('/api/workflows/'.$workflowId.'/steps/1', [
             'integration_key' => 'google.gmail',
             'action_key' => 'send_email',
         ])->assertStatus(404);
-        $this->deleteJson('/api/workflows/' . $workflowId . '/steps/1')->assertStatus(404);
+        $this->deleteJson('/api/workflows/'.$workflowId.'/steps/1')->assertStatus(404);
     }
 
     public function test_unauthenticated_requests_return_401(): void
@@ -636,12 +598,12 @@ class WorkflowApiAuditTest extends TestCase
 
         $before = WorkflowTriggerModel::where('workflow_id', $workflowId)->count();
 
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'unknown.integration',
             'trigger_key' => 'whatever',
         ])->assertStatus(422);
 
-        $this->putJson('/api/workflows/' . $workflowId . '/trigger', [
+        $this->putJson('/api/workflows/'.$workflowId.'/trigger', [
             'integration_key' => 'google.gmail',
             'trigger_key' => 'not_a_real_trigger',
         ])->assertStatus(422);
@@ -657,7 +619,7 @@ class WorkflowApiAuditTest extends TestCase
 
         $workflowId = $this->postJson('/api/workflows', ['name' => 'x'])->json('data.id');
 
-        $this->postJson('/api/workflows/' . $workflowId . '/activate')->assertStatus(409);
+        $this->postJson('/api/workflows/'.$workflowId.'/activate')->assertStatus(409);
         $this->assertDatabaseHas('workflows', ['id' => $workflowId, 'status' => 'draft']);
     }
 }

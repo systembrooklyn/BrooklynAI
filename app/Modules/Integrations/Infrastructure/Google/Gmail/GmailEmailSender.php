@@ -5,6 +5,7 @@ namespace App\Modules\Integrations\Infrastructure\Google\Gmail;
 use App\Modules\Connections\Core\ValueObjects\ResolvedGoogleCredentials;
 use Google\Client as GoogleClient;
 use Google\Service\Gmail as GoogleGmailService;
+use Google\Service\Gmail\Draft as GoogleGmailDraft;
 use Google\Service\Gmail\Message as GoogleGmailMessage;
 
 class GmailEmailSender
@@ -22,6 +23,72 @@ class GmailEmailSender
         $sent = $this->dispatch($service, $message);
 
         return $sent instanceof GoogleGmailMessage ? $sent->getId() : null;
+    }
+
+    /**
+     * Send a reply within an existing Gmail thread.
+     *
+     * The Gmail API attaches the outgoing message to the thread by setting
+     * the `threadId` on the Message resource. This is the documented,
+     * provider-native mechanism for replies and does not require fetching
+     * the original message's RFC headers.
+     */
+    public function reply(
+        ResolvedGoogleCredentials $credentials,
+        string $fromEmail,
+        string $to,
+        string $subject,
+        string $htmlBody,
+        string $threadId,
+    ): ?string {
+        $service = $this->createService($credentials);
+        $message = $this->buildMessage($fromEmail, $to, $subject, $htmlBody);
+        $message->setThreadId($threadId);
+
+        $sent = $this->dispatch($service, $message);
+
+        return $sent instanceof GoogleGmailMessage ? $sent->getId() : null;
+    }
+
+    /**
+     * Create a draft without sending it.
+     *
+     * Requires the `gmail.compose` scope on the access token.
+     *
+     * @return array{draft_id: string, message_id: ?string}|null
+     */
+    public function createDraft(
+        ResolvedGoogleCredentials $credentials,
+        string $fromEmail,
+        string $to,
+        string $subject,
+        string $htmlBody,
+    ): ?array {
+        $service = $this->createServiceForScopes($credentials, [
+            'https://www.googleapis.com/auth/gmail.compose',
+        ]);
+
+        $message = $this->buildMessage($fromEmail, $to, $subject, $htmlBody);
+
+        $draft = new GoogleGmailDraft;
+        $draft->setMessage($message);
+
+        $created = $service->users_drafts->create('me', $draft);
+
+        if (! $created instanceof GoogleGmailDraft) {
+            return null;
+        }
+
+        $messageId = null;
+        $draftMessage = $created->getMessage();
+        if ($draftMessage !== null) {
+            $messageId = $draftMessage->getId();
+        }
+
+        return [
+            'draft_id' => (string) $created->getId(),
+            'message_id' => $messageId,
+        ];
     }
 
     /**
@@ -47,12 +114,27 @@ class GmailEmailSender
 
     protected function createService(ResolvedGoogleCredentials $credentials): GoogleGmailService
     {
+        return $this->createServiceForScopes($credentials, [
+            'https://www.googleapis.com/auth/gmail.send',
+        ]);
+    }
+
+    /**
+     * @param  array<int, string>  $scopes
+     */
+    protected function createServiceForScopes(
+        ResolvedGoogleCredentials $credentials,
+        array $scopes,
+    ): GoogleGmailService {
         $client = new GoogleClient;
         $client->setClientId((string) env('GOOGLE_CLIENT_ID'));
         $client->setClientSecret((string) env('GOOGLE_CLIENT_SECRET'));
         $client->setAccessType('offline');
         $client->setApprovalPrompt('force');
-        $client->addScope('https://www.googleapis.com/auth/gmail.send');
+
+        foreach ($scopes as $scope) {
+            $client->addScope($scope);
+        }
 
         $expiresIn = 3600;
         if ($credentials->expiresAt !== null) {

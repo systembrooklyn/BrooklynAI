@@ -36,6 +36,7 @@ final class FetchGmailTriggerMessagesAction
                 $resolved,
                 $input->afterEpochSeconds,
                 $input->labelIds,
+                $input->query,
             );
         } catch (GoogleServiceException $e) {
             throw $this->translate($e);

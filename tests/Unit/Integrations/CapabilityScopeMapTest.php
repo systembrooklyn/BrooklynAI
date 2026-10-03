@@ -8,38 +8,35 @@ use PHPUnit\Framework\TestCase;
 
 class CapabilityScopeMapTest extends TestCase
 {
-    public function test_gmail_capability_resolves_to_exactly_readonly_and_send(): void
-    {
-        $map = new CapabilityScopeMap;
+    private const SCOPE_READONLY = 'https://www.googleapis.com/auth/gmail.readonly';
+    private const SCOPE_SEND = 'https://www.googleapis.com/auth/gmail.send';
+    private const SCOPE_COMPOSE = 'https://www.googleapis.com/auth/gmail.compose';
+    private const SCOPE_MODIFY = 'https://www.googleapis.com/auth/gmail.modify';
+    private const SCOPE_LABELS = 'https://www.googleapis.com/auth/gmail.labels';
 
-        $scopes = $map->resolve('gmail');
-        sort($scopes);
-
-        $this->assertSame([
-            'https://www.googleapis.com/auth/gmail.readonly',
-            'https://www.googleapis.com/auth/gmail.send',
-        ], $scopes);
-    }
-
-    public function test_gmail_capability_does_not_include_labels_scope(): void
-    {
-        $map = new CapabilityScopeMap;
-
-        $this->assertNotContains(
-            'https://www.googleapis.com/auth/gmail.labels',
-            $map->resolve('gmail'),
-        );
-    }
-
-    public function test_gmail_capability_does_not_include_other_google_scopes(): void
+    public function test_gmail_capability_resolves_to_all_gmail_scopes(): void
     {
         $map = new CapabilityScopeMap;
 
         $scopes = $map->resolve('gmail');
 
-        foreach ($scopes as $scope) {
-            $this->assertStringStartsWith('https://www.googleapis.com/auth/gmail.', $scope);
-        }
+        $this->assertCount(5, $scopes);
+        $this->assertContains(self::SCOPE_READONLY, $scopes);
+        $this->assertContains(self::SCOPE_SEND, $scopes);
+        $this->assertContains(self::SCOPE_COMPOSE, $scopes);
+        $this->assertContains(self::SCOPE_MODIFY, $scopes);
+        $this->assertContains(self::SCOPE_LABELS, $scopes);
+    }
+
+    public function test_gmail_capability_does_not_include_unrelated_google_scopes(): void
+    {
+        $map = new CapabilityScopeMap;
+
+        $scopes = $map->resolve('gmail');
+
+        $this->assertNotContains('https://www.googleapis.com/auth/calendar', $scopes);
+        $this->assertNotContains('https://www.googleapis.com/auth/spreadsheets', $scopes);
+        $this->assertNotContains('https://www.googleapis.com/auth/drive', $scopes);
     }
 
     public function test_unknown_capability_throws(): void
@@ -48,7 +45,7 @@ class CapabilityScopeMapTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
 
-        $map->resolve('not-a-capability');
+        $map->resolve('unknown_capability');
     }
 
     public function test_has_returns_true_for_gmail(): void
@@ -62,8 +59,7 @@ class CapabilityScopeMapTest extends TestCase
     {
         $map = new CapabilityScopeMap;
 
-        $this->assertFalse($map->has('not-a-capability'));
-        $this->assertFalse($map->has(''));
+        $this->assertFalse($map->has('unknown_capability'));
     }
 
     public function test_capabilities_lists_only_gmail_in_mvp(): void

@@ -101,7 +101,7 @@ Status: `COMPLETE / CLOSED / VERIFIED`.
 - New execution retry semantics.
 - Connection-level Gmail polling pooling.
 - Arbitrary new OAuth scopes supplied by the client.
-- Label mutation (create/update/delete).
+- Label mutation (create/update/delete) as a standalone HTTP contract.
 - Attachment downloading or content processing.
 - Gmail `historyId` cursor.
 
@@ -191,6 +191,13 @@ Provide accurate, maintainable, frontend-consumable Swagger/OpenAPI documentatio
 - Global configuration: `app/Modules/Swagger/OpenApi.php`.
 - Per-module path files: Identity, Connections, Automation, Execution, Integrations.
 
+**Servers declared:**
+
+- `http://localhost:8000` — "Local Development"
+- `https://sea-turtle-app-vshwt.ondigitalocean.app` — "Production"
+
+Swagger UI exposes a server dropdown so operators can switch environments.
+
 **Configuration:**
 
 - `config/l5-swagger.php` published.
@@ -199,7 +206,7 @@ Provide accurate, maintainable, frontend-consumable Swagger/OpenAPI documentatio
 
 **Coverage:**
 
-- 57 operations, 57 unique operationIds at Phase 8 close. Catalog + Login batches added one each.
+- 57 operations at Phase 8 close. Catalog + Login batches added one each.
 
 **Security:**
 
@@ -231,6 +238,7 @@ Provide accurate, maintainable, frontend-consumable Swagger/OpenAPI documentatio
 - [x] `$ref` resolution verified.
 - [x] OperationIds unique.
 - [x] Documented endpoints match registered routes.
+- [x] Both servers (Local Development, Production) declared.
 - [x] Full test suite green.
 - [x] Pint green on `app/Modules`.
 - [x] Human approval to close Phase 8.
@@ -371,7 +379,7 @@ Status: `COMPLETE / CLOSED / VERIFIED`.
 **Runtime:**
 
 - `PollGmailCommand` — self-email filter, `hasInProgressForWorkflow` check, per-trigger cache lock, cursor advancement past skipped messages, `next_poll_at` scheduling, rate limiter at dispatch.
-- `RunWorkflowJob` — `ShouldQueue`, `ShouldBeUnique`, `$tries = 3`, `$backoff = [30, 120, 600]`, `$uniqueFor = 3600`.
+- `RunWorkflowJob` — `ShouldQueue`, `ShouldBeUnique`, `$tries = 3`, `$backoff = [30, 120, 600]`, `$uniqueFor = 3600`. Retained for legacy/manual flows.
 - `RecoverFailedPollExecutionsCommand` — `MAX_RETRIES = 3`, `GRACE_MINUTES = 10`, `BATCH_SIZE = 100`, CAS claim, `retry_of_id` lineage.
 
 **Schema:**
@@ -419,7 +427,7 @@ No self-exclusion filter existed in the polling runtime.
 
 ## Resolution
 
-`PollGmailCommand::filterOutSelfEmails` compares each fetched message's `From:` header against the connected Gmail account email, case-insensitively, supporting both raw-email and display-name forms. Self-authored messages are skipped before dispatch, logged at INFO level, and the cursor advances past them.
+`filterOutSelfEmails` (in `PollGmailCommand` and `GmailPollStrategy`) compares each fetched message's `From:` header against the connected Gmail account email, case-insensitively, supporting both raw-email and display-name forms. Self-authored messages are skipped before dispatch, logged at INFO level, and the cursor advances past them.
 
 ## Verification
 
@@ -498,7 +506,7 @@ Path A is `COMPLETE / CLOSED / VERIFIED`.
 
 # Production Scheduler Hardening
 
-Post-Phase-8 hardening effort. Not a numbered phase.
+Post-Phase-8 hardening effort. Not a numbered phase. All batches COMPLETE.
 
 ## Batch 1 — Foundation
 
@@ -547,7 +555,49 @@ Deliverables:
 - `InternalSchedulerMiddleware` — bearer token, rate limit, misconfig detection
 - `InternalSchedulerTickController`
 - Global tick lock (`scheduler-tick-global`)
-- New env vars documented
+
+## Batch 5 — Recovery Generalization and Stuck-Running Sweep
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `ExecutionRepository::markStaleRunningAsFailed()`
+- Stale-running sweep runs at start of every tick
+- `INTERNAL_SCHEDULER_STALE_RUNNING_MINUTES` config
+- `tests/Feature/Execution/StuckRunningExecutionRecoveryTest.php`
+
+## Batch 6 — `next_poll_at` Index Optimization
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- Migration adding `INDEX (next_poll_at)` on `workflow_triggers`
+- Existing composite preserved
+- No behavior change
+
+## Batch 7 — Google Apps Script Production Scheduler
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- Apps Script code (external) — 5-minute clock, reads URL + token from ScriptProperties, POSTs to internal endpoint with bearer auth
+- `OVERLAP_SECONDS = 360` in `GmailPollStrategy` and `PollGmailCommand`
+- `PollGmailCommandTest::test_subsequent_tick_uses_cursor_overlap` updated to expect `640`
+- Production URL: `https://sea-turtle-app-vshwt.ondigitalocean.app/api/internal/scheduler/tick`
+- Local URL: `http://localhost:8000/api/internal/scheduler/tick`
+
+## Batch 8 — Final Production Documentation
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `docs/02_IMPLEMENTATION_STATE.md` updated
+- `docs/04_PHASE_GATES.md` updated
+- `docs/08_DEPLOYMENT.md` updated
 
 ## Strategy Test Coverage
 
@@ -559,53 +609,224 @@ Deliverables:
 - `tests/Feature/Execution/GmailPollStrategyTest.php` — 3 tests / 13 assertions
 - `tests/Feature/Internal/SchedulerTickTest.php` — 6 tests / 17 assertions
 - `tests/Feature/Execution/TriggerCoordinatorTest.php` — 3 tests / 5 assertions
+- `tests/Feature/Execution/StuckRunningExecutionRecoveryTest.php` — 5 tests / 10 assertions
 
 ## Scheduler Gate
 
-- [x] Trigger Coordinator exists.
-- [x] TriggerStrategy contract exists.
-- [x] `ScheduleStrategy` and `GmailPollStrategy` implemented.
-- [x] Internal tick endpoint implemented and authenticated.
-- [x] Global lock implemented.
-- [x] Due query is generic (no Gmail hardcoding).
-- [x] Execution path reaches `RunWorkflowAction`.
-- [x] No queue worker required for the new scheduler path.
+- [x] Batch 1 (Foundation).
+- [x] Batch 2 (Schedule Strategy).
+- [x] Batch 3 (Gmail Poll Strategy).
+- [x] Batch 4 (Internal Scheduler API).
+- [x] Batch 5 (Stuck-Running Sweep).
+- [x] Batch 6 (`next_poll_at` Index).
+- [x] Batch 7 (Apps Script + Overlap).
+- [x] Batch 8 (Documentation).
 - [x] Strategy test coverage green.
-- [x] Full suite green at 704 tests / 2117 assertions.
+- [x] External clock configured in production environment.
+- [x] Full suite green at scheduler close: 709 passed / 2127 assertions / 0 failures.
 
-## Batches 5–8
+Production Scheduler Hardening is `COMPLETE / CLOSED / VERIFIED`.
 
-Status: `NOT STARTED`.
+---
 
-- Batch 5 — Recovery generalization and stuck-`running` sweep.
-- Batch 6 — `next_poll_at` index optimization.
-- Batch 7 — Apps Script production setup and token configuration.
-- Batch 8 — Final production documentation and deployment checklist.
+# Gmail Integration Completion
+
+Post-Phase-8 branch. Not a numbered phase. All batches COMPLETE / CLOSED / VERIFIED for the MVP scope.
+
+This branch completed the Gmail integration as the platform's reference
+integration: it added nine new actions on top of the existing `send_email`,
+extended the `new_email_received` trigger with four optional filters, and
+expanded the Gmail OAuth capability scope set to five scopes.
+
+## Batch 1 — `reply_to_email`
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `GmailEmailSender::reply()` — sets `threadId` on the outgoing Message.
+- `ReplyToGmailEmailInput`, `ReplyToGmailEmailAction`, `GmailReplyToEmailHandler`.
+- Fields: `to`, `subject`, `body`, `thread_id`.
+- Scope: `gmail.send` (no new scope).
+
+## Batch 2 — Trigger filtering
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `GmailTriggerQueryComposer` — composes Gmail `q` from config.
+- `GmailMessageReader::listMessageIds()` accepts optional `?string $query`.
+- `new_email_received` gained `from`, `subject`, `has_attachment`, `query` fields.
+- Scope unchanged (`gmail.readonly`).
+
+## Batch 3 — `create_draft`
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `GmailEmailSender::createDraft()` — uses `users_drafts->create`.
+- `CreateGmailDraftInput`, `CreateGmailDraftResult`, `CreateGmailDraftAction`, `GmailCreateDraftHandler`.
+- Scope: `gmail.compose` (added to `CapabilityScopeMap`).
+- Existing connections must reconnect.
+
+## Batch 4 — Message modification actions
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `GmailMessageModifier` — `markAsRead`, `markAsUnread`, `archive`, `trash`.
+- Four actions, four handlers.
+- Scope: `gmail.modify` (added to `CapabilityScopeMap`).
+- Existing connections must reconnect.
+
+## Batch 5 — Label actions
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `GmailMessageModifier::addLabel()`, `removeLabel()`.
+- `GmailLabelCreator::create()` — uses `users_labels->create`.
+- Three actions, three handlers.
+- Scopes: `gmail.modify` (already added in Batch 4), `gmail.labels` (new).
+- Existing connections must reconnect for `create_label`.
+
+## Batch 6 — Attachment metadata
+
+Status: `COMPLETE` (documentation-only).
+
+Deliverables:
+
+- No code changes. Attachment metadata (`has_attachment`, `attachment_count`, `attachment_ids`) is already produced by `GmailMessagePayloadBuilder` and reaches every execution's `trigger_payload`.
+- Attachment binary retrieval deferred until Drive/storage architecture exists.
+
+## Gmail Integration Gate
+
+- [x] All nine new actions implemented, registered, and covered by focused tests (ten total Gmail actions including the pre-existing `send_email`).
+- [x] Trigger filtering extended and covered by tests.
+- [x] Five Gmail scopes declared in `CapabilityScopeMap`.
+- [x] `GmailMessagePayloadBuilder` still produces the canonical 14-key payload.
+- [x] Attachment metadata available in every trigger payload.
+- [x] Attachment binary retrieval explicitly deferred.
+- [x] No new HTTP endpoints; no new Swagger operations.
+- [x] Existing workflows using only `send_email`, `reply_to_email`, `new_email_received` are unaffected by scope expansion.
+- [x] Full suite green at Gmail close: 752 passed / 2267 assertions / 0 failures.
+- [x] Real Gmail E2E verification for the new actions and filters: VERIFIED. See the "Gmail E2E Verification Pass" section below.
+
+## Gmail Integration Completion is `COMPLETE / CLOSED / VERIFIED`.
+
+---
+
+# Gmail E2E Verification Pass
+
+Post-Phase-8 verification pass. Not a numbered phase.
+
+## Goal
+
+Prove the entire Gmail integration stack works end-to-end against a real
+Gmail account: OAuth connection, workflow lifecycle, all ten Gmail actions,
+all four new trigger filters, multi-step execution, inter-step template
+resolution, scheduler tick, polling, and unauthenticated rejection.
+
+## Scope
+
+- Twelve sections of manual live verification.
+- Real Gmail mailbox as the integration target.
+- Local Laravel instance.
+- Manual `POST /api/internal/scheduler/tick` calls to control timing (not the
+  Apps Script clock).
+- No new code, no new endpoints, no schema changes.
+
+## Sections verified
+
+| Section | Coverage | Result |
+| --- | --- | --- |
+| 1 | Auth: valid token, missing token, login success/failure | PASS |
+| 2 | Catalog: 10 Gmail actions, 1 trigger, filter fields, empty `{}` | PASS |
+| 3 | Connections: list, OAuth start, callback, labels, ownership | PASS |
+| 4 | Workflow CRUD: create, show, update, delete, restore, cross-user 404 | PASS |
+| 5 | Trigger CRUD: upsert, replace, validation, ownership | PASS |
+| 6 | Step CRUD: positions, gaps, update, delete, no reindex | PASS |
+| 7 | Activation: requires trigger, transitions, `next_poll_at` reset | PASS |
+| 8 | Manual execution: success, failure, idempotency, reserved prefixes, overlap | PASS |
+| 9 | Scheduler tick: cursor init, real poll, real Gmail side effect, dedup | PASS |
+| 10 | All ten Gmail actions against a real account | PASS |
+| 10 | Multi-step (7-step) workflow execution | PASS |
+| 10 | Inter-step `{{ steps.N.output.* }}` template resolution | PASS |
+| 10 | `has_attachment` filter (positive + negative) | PASS |
+| 10 | `query: "is:unread"` filter (positive; negative covered indirectly) | PASS |
+| 10 | `subject`, `label_id` filters | PASS |
+| 11 | Hero test: trigger → `mark_as_read` → `reply_to_email` in same thread | PASS |
+| 12 | All 21 protected endpoints return 401 unauthenticated | PASS |
+| 12 | Internal scheduler tick returns 401 unauthenticated | PASS |
+
+## Known items carried forward
+
+- `missing_scopes` activation path was skipped live (no old-scope-only
+  connection available). Covered by automated tests. Must be exercised
+  against a real old-scope-only connection before production deployment.
+- `is:unread` negative case not directly demonstrated in the live pass;
+  positive case verified three times. Negative path shares its implementation
+  with `has_attachment`, whose negative case WAS verified live.
+- Scheduler tick unauthenticated body returned `{"message":"Unauthenticated."}`
+  rather than the middleware's declared `{"error":"unauthorized"}`. Status
+  code 401 is correct. To investigate in a maintenance pass. Not a security
+  regression.
+
+## Gate
+
+- [x] Section 1 — Auth verified.
+- [x] Section 2 — Catalog verified.
+- [x] Section 3 — Connections verified.
+- [x] Section 4 — Workflow CRUD verified.
+- [x] Section 5 — Trigger CRUD verified.
+- [x] Section 6 — Step CRUD verified.
+- [x] Section 7 — Activation/lifecycle verified (missing_scopes skipped with documented reason).
+- [x] Section 8 — Manual execution + idempotency verified.
+- [x] Section 9 — Scheduler tick + polling verified.
+- [x] Section 10 — All 10 Gmail actions verified against a real account.
+- [x] Section 10 — All new trigger filters verified (positive; negative where applicable).
+- [x] Section 10 — Multi-step execution verified.
+- [x] Section 10 — Inter-step template resolution verified.
+- [x] Section 11 — Hero test verified end-to-end.
+- [x] Section 12 — Unauthenticated access matrix verified.
+- [x] All workflows paused after the run.
+- [x] No credential leakage observed.
+
+Gmail E2E Verification Pass is `COMPLETE / VERIFIED`.
 
 ---
 
 # Cumulative Test Growth
 
-| Phase / Batch | Total Tests | Total Assertions |
-| --- | --- | --- |
-| Phase 0 close | 26 | 75 |
-| Phase 2 close | 52 | 179 |
-| Phase 3 close | 84 | 495 |
-| Phase 4 close | 99 | 519 |
-| Phase 5 close | 293 | 986 |
-| Batch 6.5 close (Phase 6 close) | 507 | 1486 |
-| Batch 7.1 close | 519 | 1512 |
-| Batch 7.2 close | 540 | 1576 |
-| Batch 7.3 close | 577 | 1670 |
-| Batch 7.4 close | 607 | 1749 |
-| Batch 7.5 close (Phase 7 close) | 607 | 1749 |
-| Phase 8 close | 607 | 1749 |
-| Catalog batch close | 621 | 1893 |
-| Login API batch close | 632 | 1929 |
-| Post-Login full-suite (pre-Path-A) | 663 | 1963 |
-| Post-Path-A full suite | 689 | 2068 |
-| Post scheduler Batches 1–4 | 698 | 2090 |
-| **Post scheduler + strategy coverage (current)** | **704** | **2117** |
+| Phase / Batch                          | Total Tests | Total Assertions |
+| -------------------------------------- | ----------- | ---------------- |
+| Phase 0 close                          | 26          | 75               |
+| Phase 2 close                          | 52          | 179              |
+| Phase 3 close                          | 84          | 495              |
+| Phase 4 close                          | 99          | 519              |
+| Phase 5 close                          | 293         | 986              |
+| Batch 6.5 close (Phase 6 close)        | 507         | 1486             |
+| Batch 7.1 close                        | 519         | 1512             |
+| Batch 7.2 close                        | 540         | 1576             |
+| Batch 7.3 close                        | 577         | 1670             |
+| Batch 7.4 close                        | 607         | 1749             |
+| Batch 7.5 close (Phase 7 close)        | 607         | 1749             |
+| Phase 8 close                          | 607         | 1749             |
+| Catalog batch close                    | 621         | 1893             |
+| Login API batch close                  | 632         | 1929             |
+| Post-Login full-suite (pre-Path-A)     | 663         | 1963             |
+| Post-Path-A full suite                 | 689         | 2068             |
+| Post scheduler Batches 1–4             | 698         | 2090             |
+| Post scheduler + strategy coverage     | 704         | 2117             |
+| Post scheduler hardening close         | 709         | 2127             |
+| **Gmail Integration Completion close** | **752**     | **2267**         |
+
+The Gmail E2E Verification Pass is a manual live-verification pass. It did not
+add or change automated tests. Test count remains 752 / 2267.
 
 ---
 

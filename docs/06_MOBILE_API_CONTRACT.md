@@ -2,8 +2,8 @@
 
 Status: read-only contract derived from the currently implemented API.
 
-Version: 1.0.4
-Last updated: after Catalog Contract Alignment batch.
+Version: 1.0.6
+Last updated: after Gmail E2E Verification Pass.
 
 This document is written for the mobile developer. It describes only behavior that exists in the backend today. Anything not present in the code is explicitly marked NOT IMPLEMENTED or DEFERRED.
 
@@ -408,15 +408,34 @@ Deleting a connection you do not own: HTTP 404 `{ "message": "Connection not fou
 
 ### 3.5 Gmail capability scopes requested at consent time
 
-For `capability=gmail` the backend requests:
+For `capability=gmail`, the backend requests the five Gmail scopes declared by `CapabilityScopeMap`:
 
 - `openid`
 - `email`
 - `profile`
 - `https://www.googleapis.com/auth/gmail.readonly`
 - `https://www.googleapis.com/auth/gmail.send`
+- `https://www.googleapis.com/auth/gmail.compose`
+- `https://www.googleapis.com/auth/gmail.modify`
+- `https://www.googleapis.com/auth/gmail.labels`
 
-`gmail.compose` and `gmail.labels` are NOT requested at consent time. A `create_draft` action can still require `gmail.compose` at activation time; that scope would not be present on a consent-only Gmail connection.
+**Reconnect required.** Existing Google connections created before the Gmail
+Integration Completion branch hold only the original `gmail.readonly` and
+`gmail.send` scopes. To use any Gmail action that requires `gmail.compose`,
+`gmail.modify`, or `gmail.labels` — namely `create_draft`, `mark_as_read`,
+`mark_as_unread`, `archive`, `trash`, `add_label`, `remove_label`,
+`create_label` — the user must reconnect the Google account so the new scopes
+are granted. Connections that continue to use only `send_email`,
+`reply_to_email`, and `new_email_received` do not need to reconnect.
+
+`gmail.readonly` alone is sufficient for `new_email_received`. `gmail.send`
+alone is sufficient for `send_email` and `reply_to_email`. `gmail.compose`
+alone is sufficient for `create_draft`. `gmail.modify` alone is sufficient for
+`mark_as_read`, `mark_as_unread`, `archive`, `trash`, `add_label`,
+`remove_label`. `gmail.labels` alone is sufficient for `create_label`.
+
+The authoritative per-action scope is declared on `ActionDefinition::requiredScopes`
+and enforced server-side at activation time. Mobile does not send scopes.
 
 ---
 
@@ -483,6 +502,30 @@ Response envelope:
                 "operation_id": "gmail.labels",
                 "params": { "connection_id": "{{connection_id}}" }
             }
+        },
+        "from": {
+            "label": "From",
+            "type": "string",
+            "required": false,
+            "description": "Only trigger for emails whose sender matches this filter. Uses Gmail search syntax (for example user@example.com)."
+        },
+        "subject": {
+            "label": "Subject",
+            "type": "string",
+            "required": false,
+            "description": "Only trigger for emails whose subject matches this filter. Multi-word values are matched as a phrase."
+        },
+        "has_attachment": {
+            "label": "Has Attachment",
+            "type": "boolean",
+            "required": false,
+            "description": "Only trigger for emails that carry an attachment."
+        },
+        "query": {
+            "label": "Advanced Query",
+            "type": "string",
+            "required": false,
+            "description": "Optional raw Gmail search query, for example \"is:unread larger:5M\". Advanced users only."
         }
     }
 }
@@ -495,6 +538,25 @@ Response envelope:
 **`capability` is nullable.** The example above shows a Gmail trigger, which declares `capability: "gmail"`. Integrations that do not declare a capability (e.g. Calendar, Sheets, Docs, Analytics) will return `"capability": null`. Do not type `capability` as non-nullable on the mobile side.
 
 **`required_scopes` is not exposed.** Scope validation happens server-side at activation time. Mobile does not send scopes.
+
+**Gmail trigger filters.** `new_email_received` supports the following optional
+filters. Only `label_id` is resolved dynamically via the `gmail.labels`
+operation. `from`, `subject`, `has_attachment`, and `query` are plain inputs:
+
+- `label_id` — optional Gmail label ID. Sent to Gmail as a separate
+  `labelIds` parameter, not as part of the search query.
+- `from` — optional sender filter. Composed by the backend into Gmail's
+  native `q` syntax as `from:<value>`.
+- `subject` — optional subject filter. Composed as `subject:<value>`; values
+  containing whitespace are automatically double-quoted so the phrase is
+  matched as a whole.
+- `has_attachment` — optional boolean. When `true`, the backend appends
+  `has:attachment` to the search query.
+- `query` — optional raw Gmail search query appended last. Advanced users
+  only; the mobile UI should not surface this without a clear warning.
+
+These filters only affect which messages the trigger considers. They do not
+change the trigger payload shape or the execution model.
 
 ### 4.4 Action object
 
@@ -517,6 +579,10 @@ Response envelope:
 **`config` map.** Same rule as triggers: each key inside `config` is the exact field key Mobile must send in the Workflow API request `config` object.
 
 **Actions with no configuration** return `"config": {}` (empty object). Mobile must not assume any fields exist.
+
+**Important — the catalog does not currently expose action output schemas.**
+
+The catalog describes **inputs only**. It does not declare, per action, which keys the action returns. This matters for multi-step workflows where a later step references an earlier step's output (see §5.17). The verified output keys for all Gmail actions are documented in §5.9 of this contract. For Calendar / Sheets / Docs / Analytics actions, output schemas are **not yet formally documented** and must not be assumed — those actions currently have no runtime handlers and cannot be executed as workflow steps at all.
 
 ### 4.5 Field object (inside `config` map)
 
@@ -561,30 +627,50 @@ Optional keys (only present when defined): `description`, `default`, `options`, 
 
 ### 4.6 Currently catalog-defined integrations
 
-- `google.gmail` — `send_email`, `reply_to_email`, `create_draft`, trigger `new_email_received`
-- `google.calendar` — 5 actions
-- `google.sheets` — 9 actions
-- `google.docs` — 7 actions
-- `google.analytics` — 5 actions
-- `google.drive` — no actions, no triggers
+- `google.gmail` — 10 actions, 1 trigger.
+    - Actions: `send_email`, `reply_to_email`, `create_draft`, `mark_as_read`,
+      `mark_as_unread`, `archive`, `trash`, `add_label`, `remove_label`,
+      `create_label`.
+    - Trigger: `new_email_received`.
+- `google.calendar` — 5 actions.
+- `google.sheets` — 9 actions.
+- `google.docs` — 7 actions.
+- `google.analytics` — 5 actions.
+- `google.drive` — no actions, no triggers.
 
 ### 4.7 Currently executable at runtime vs. catalog-only
 
-The backend currently has runtime handlers only for:
+The backend currently has runtime handlers for:
 
-- **Trigger** `google.gmail.new_email_received` — driven by `workflows:poll-gmail`.
-- **Action** `google.gmail.send_email` — driven by `GmailSendEmailHandler`.
+- **Trigger** `google.gmail.new_email_received` — driven by `GmailPollStrategy`.
+- **All ten Gmail actions**, each with a dedicated handler in the Execution module:
+    - `google.gmail.send_email`
+    - `google.gmail.reply_to_email`
+    - `google.gmail.create_draft`
+    - `google.gmail.mark_as_read`
+    - `google.gmail.mark_as_unread`
+    - `google.gmail.archive`
+    - `google.gmail.trash`
+    - `google.gmail.add_label`
+    - `google.gmail.remove_label`
+    - `google.gmail.create_label`
 
-Every other catalog entry is **catalog-defined but not currently executable as a workflow trigger/step** at runtime. The workflow API will still accept them (validation only checks catalog membership), but execution will fail because no handler exists for them.
+Every other catalog entry (Calendar, Sheets, Docs, Analytics) is
+**catalog-defined but not currently executable as a workflow trigger/step** at
+runtime. The workflow API will still accept them (validation only checks
+catalog membership), but execution will fail because no handler exists for
+them.
 
-Field metadata is authoritative only where a runtime handler exists:
+Field metadata is authoritative for every Gmail action and trigger that
+currently has a runtime handler. For Calendar / Sheets / Docs / Analytics
+actions, `config` is an empty object `{}` and no field metadata is published.
 
-- `send_email`: `to` (email, required), `subject` (string, required), `body` (text, required).
-- `new_email_received`: `label_id` (select, optional) with dynamic options from `gmail.labels`.
-
-`reply_to_email`, `create_draft`, and all Calendar / Sheets / Docs / Analytics actions expose `config: {}`.
-
-Mobile should treat the catalog as the discovery surface, and additionally gate action availability on the presence of a non-empty `config` object today. This will change when a future batch adds more handlers.
+**Reconnect requirement reminder.** The new Gmail actions require scopes that
+were not requested on older Google connections. See §3.5. Mobile should
+proactively detect this by re-fetching `GET /api/connections` after the Gmail
+integration was updated, and prompt the user to reconnect their Google account
+if the connection's `scopes` array is missing the required scope for the action
+the user wants to configure.
 
 ### 4.8 Dynamic configuration options
 
@@ -606,7 +692,7 @@ No hardcoded endpoint per integration. No mapping table. The `operation_id` is t
 
 ### 5.0 End-to-end summary
 
-```
+```text
 Login (Google OAuth redirect, email/password login, or /api/test/login for dev)
 → Sanctum token
 → GET /api/connections                (list user-owned connections)
@@ -712,7 +798,15 @@ Fields:
 
 **`integration_key`, `trigger_key`, and each key inside `config` are used verbatim from the Catalog response.** No translation.
 
-**`interval_minutes` semantics:** `interval_minutes` is relevant only for `schedule`-strategy triggers (consumed by `workflows:run-scheduled`). It does **not** configure the Gmail polling frequency for `new_email_received`. For a Gmail poll trigger, `interval_minutes` is stored but not used by the polling runtime — polling runs on its own schedule (`workflows:poll-gmail`, invoked every minute with `withoutOverlapping(5)`).
+**`interval_minutes` semantics:** `interval_minutes` is relevant only for `schedule`-strategy triggers (consumed by `workflows:run-scheduled`). It does **not** configure the Gmail polling frequency for `new_email_received`. For a Gmail poll trigger, `interval_minutes` is stored but not used by the polling runtime — polling runs on its own schedule (`workflows:poll-gmail`, invoked every minute with `withoutOverlapping(5)`). Under the production scheduler architecture, Gmail polling is driven by the external 5-minute Apps Script clock via `POST /api/internal/scheduler/tick`, not by the queue scheduler.
+
+**Gmail trigger filters (current).** `new_email_received` accepts the following optional `config` keys. All are optional; omit any that do not apply.
+
+- `label_id` (string, optional) — Gmail label ID. Passed to Gmail as a separate `labelIds` parameter, not part of the search `q` string.
+- `from` (string, optional) — sender filter. Composed into the Gmail `q` as `from:<value>`.
+- `subject` (string, optional) — subject filter. Composed as `subject:<value>`. Values containing spaces are automatically quoted so the phrase is matched as a whole.
+- `has_attachment` (boolean, optional) — when `true`, appends `has:attachment` to the `q` string.
+- `query` (string, optional) — raw Gmail search syntax, appended last. Advanced only.
 
 **`label_id` handling on `new_email_received` (IMPORTANT):**
 
@@ -721,11 +815,17 @@ Fields:
 - **Do NOT send `"label_id": null`.**
 - **Do NOT send `"label_id": ""`.**
 
-Reason: `PollGmailCommand::extractLabelIds` distinguishes three cases:
+Reason: `GmailPollStrategy::extractLabelIds` (and the retained `PollGmailCommand::extractLabelIds`) distinguishes three cases:
 
 - Key absent → no filter, polling proceeds.
 - Key present with a non-empty string → filter applied.
 - Key present with `null`, empty string, or non-string → the polling runtime treats it as malformed and **skips the workflow on every poll** (cursor unchanged, warning logged). It does not behave as "no filter".
+
+The same "omit when empty" rule applies to the new string filters: omitting
+`from` / `subject` / `query` means "no filter". Sending an empty string is
+treated as "no filter" by `GmailTriggerQueryComposer`, but the recommended
+pattern for Mobile is to omit the key entirely when the user has not supplied
+a value.
 
 Response (HTTP 200): the persisted trigger.
 
@@ -767,6 +867,56 @@ Body: {
 Response (HTTP 201): the persisted step. Position is assigned automatically as `max(existing position) + 1`.
 
 Errors: same pattern as trigger upsert.
+
+**Gmail action config keys.** The Gmail actions currently expose the following
+`config` keys (see §4.6 for the catalog list). Mobile must populate them
+verbatim from the catalog response, using `{{ trigger.* }}` or
+`{{ steps.N.output.* }}` templates where the value comes from a trigger payload
+or a previous step's output:
+
+- `send_email` — `to` (email), `subject` (string), `body` (text).
+- `reply_to_email` — `to` (email), `subject` (string), `body` (text),
+  `thread_id` (string). Typically `to = {{ trigger.from }}`,
+  `subject = "Re: {{ trigger.subject }}"`, `thread_id = {{ trigger.thread_id }}`.
+- `create_draft` — `to` (email), `subject` (string), `body` (text).
+- `mark_as_read` — `message_id` (string). Typically `{{ trigger.message_id }}`.
+- `mark_as_unread` — `message_id` (string).
+- `archive` — `message_id` (string).
+- `trash` — `message_id` (string).
+- `add_label` — `message_id` (string), `label_id` (select, dynamic via
+  `gmail.labels`).
+- `remove_label` — `message_id` (string), `label_id` (select, dynamic via
+  `gmail.labels`).
+- `create_label` — `name` (string).
+
+**Gmail action output keys (VERIFIED against a real Gmail account).**
+
+Each Gmail action returns a **safe, whitelisted output** — never the raw
+provider response. The keys below are the ones the backend actually returns
+today. They are the only keys that may be referenced from a later step via
+`{{ steps.N.output.<key> }}`.
+
+| Action | Output keys | Example |
+| --- | --- | --- |
+| `send_email` | `sent` (boolean), `message_id` (string) | `{ "sent": true, "message_id": "1a101cf1b7ca9c08" }` |
+| `reply_to_email` | `sent` (boolean), `message_id` (string) | `{ "sent": true, "message_id": "1a1021a26fe357a3" }` |
+| `create_draft` | `created` (boolean), `draft_id` (string), `message_id` (string) | `{ "created": true, "draft_id": "r-7036261660220453950", "message_id": "1a101d92dd8bdabb" }` |
+| `mark_as_read` | `modified` (boolean), `message_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54" }` |
+| `mark_as_unread` | `modified` (boolean), `message_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54" }` |
+| `archive` | `modified` (boolean), `message_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54" }` |
+| `trash` | `modified` (boolean), `message_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54" }` |
+| `add_label` | `modified` (boolean), `message_id` (string), `label_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54", "label_id": "Label_1" }` |
+| `remove_label` | `modified` (boolean), `message_id` (string), `label_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54", "label_id": "Label_1" }` |
+| `create_label` | `created` (boolean), `label_id` (string), `name` (string) | `{ "created": true, "label_id": "Label_1", "name": "E2E-MultiLabel" }` |
+
+**These output keys are the ONLY stable contract for inter-step references.**
+Do not assume additional keys exist. Any key not listed above is not returned
+by the backend and any reference to it will fail at runtime.
+
+**Output schemas for Calendar / Sheets / Docs / Analytics are NOT documented.**
+Those actions currently have no runtime handlers and cannot be executed as
+workflow steps at all. Do not attempt to reference their outputs. Do not
+invent output keys for them.
 
 ### 5.10 Update step
 
@@ -826,6 +976,13 @@ Error codes:
 
 `missing_scopes` context includes `missing_scopes: [<scope-uri>, ...]`.
 
+**Gmail scope errors.** If a workflow uses one of the Gmail actions or triggers
+that requires a scope the connection does not have — for example, using
+`create_draft` on a connection that was authorized before `gmail.compose` was
+added — activation returns `409` with `error: "missing_scopes"` and the
+missing scope URI in `context.missing_scopes`. Mobile should surface this as
+"please reconnect your Google account" and re-run the connection flow.
+
 For a simpler trigger failure (no trigger configured) the response is HTTP 409 with `{ "message": "Workflow cannot be activated without a trigger" }`.
 
 ### 5.13 Pause workflow
@@ -870,6 +1027,472 @@ GET /api/executions/{id}
 ```
 
 Only the owning user can read an execution.
+
+### 5.17 Multi-step template resolution
+
+Workflow step `config` values may contain **templates** that are resolved at
+execution time against data available in the execution context. Two template
+roots are supported:
+
+**Root 1 — `{{ trigger.* }}`**
+
+References a key from the trigger payload of the current execution. The
+trigger payload shape is defined by the trigger.
+
+For `google.gmail.new_email_received`, the trigger payload exposes the
+canonical 14-key whitelist documented in the Gmail integration:
+
+```
+message_id
+thread_id
+from
+to
+cc
+subject
+snippet
+body
+received_at
+received_at_epoch_ms
+labels
+has_attachment
+attachment_count
+attachment_ids
+```
+
+Example:
+
+```
+{{ trigger.message_id }}
+{{ trigger.from }}
+{{ trigger.thread_id }}
+{{ trigger.has_attachment }}
+```
+
+**Root 2 — `{{ steps.N.output.* }}`**
+
+References an output key from a **previous step's** execution result.
+
+- `N` is the **1-based position** of a previous step in the same workflow.
+- `N` must refer to a step that runs **before** the step currently being
+  resolved. Referencing the current step or a future step is invalid.
+- `output` is a fixed literal segment (it is the word "output").
+- `<key>` must be one of the output keys actually returned by that previous
+  step's action. See §5.9 for the verified output keys per Gmail action.
+
+Example:
+
+```
+{{ steps.1.output.label_id }}
+{{ steps.2.output.message_id }}
+{{ steps.3.output.draft_id }}
+```
+
+**Rules**
+
+1. **Position is 1-based.** The first step in a workflow is position `1`, not
+   `0`.
+2. **Position refers to workflow position, not step ID.** If a step is
+   deleted and positions have gaps (for example `1`, `3`, `4`), references use
+   those numeric positions, not renumbered indices. See §5.11 — positions are
+   not reindexed on delete.
+3. **The `<key>` segment must exist in the referenced step's output.** The
+   authoritative list of keys per action is in §5.9. Referencing a key the
+   action does not return fails the step at runtime.
+4. **The referenced step must run before the current step.** Forward
+   references or self-references are invalid.
+5. **Whole-template resolution preserves the resolved value's type.** When a
+   `config` value is a whole-string template like
+   `"{{ steps.1.output.label_id }}"` and the referenced value is a string, the
+   resolved `config` value is that string — not the string wrapped in quotes.
+   When the referenced value is a boolean, the resolved value is a boolean.
+   Mobile does not need to coerce types.
+6. **Embedded templates resolve to strings.** If a template is mixed with
+   other text, such as `"Re: {{ trigger.subject }}"`, the resolved value is a
+   single string. If the referenced value is an array or object and the
+   template is embedded rather than whole-string, resolution fails.
+7. **Invalid, nonexistent, or future step references fail at runtime.** They
+   are not silently ignored. The step will be marked `failed` and the
+   execution status will become `failed`. The failing step records a
+   diagnostic `error_message`. Two common shapes:
+    - `Template path "trigger.<key>" cannot be resolved.` — the key is
+      missing from the trigger payload.
+    - `Template path "steps.<N>.output.<key>" cannot be resolved.` — the step
+      reference is missing, future, or the key is not part of the referenced
+      step's output.
+
+**Template syntax is validated on save.** `POST /api/workflows/{id}/steps` and
+`PUT /api/workflows/{id}/steps/{position}` return `422` with an error on
+`config` if a template is syntactically malformed (for example
+`{{ trigger. }}`). Semantic validation (whether the key exists) happens at
+execution time, not at save time.
+
+**A worked example of the multi-step pattern is in §5.18.**
+
+### 5.18 Worked example — multi-step workflow with inter-step references
+
+This example is the exact workflow verified end-to-end during the Gmail E2E
+Verification Pass. It is a real 7-step workflow that was run against a real
+Gmail account.
+
+**Purpose:** create a label, apply it to an incoming email, flip the read
+state twice, remove the label, then archive and trash the message. Steps 2 and
+5 reference the label ID produced by step 1.
+
+**Step order (position → action):**
+
+| Position | Action | Notes |
+| --- | --- | --- |
+| 1 | `create_label` | Creates the label and returns its `label_id`. |
+| 2 | `add_label` | Uses `{{ steps.1.output.label_id }}`. |
+| 3 | `mark_as_unread` | Uses `{{ trigger.message_id }}`. |
+| 4 | `mark_as_read` | Uses `{{ trigger.message_id }}`. |
+| 5 | `remove_label` | Uses `{{ steps.1.output.label_id }}`. |
+| 6 | `archive` | Uses `{{ trigger.message_id }}`. |
+| 7 | `trash` | Uses `{{ trigger.message_id }}`. |
+
+**Step 1 — create the label**
+
+```
+POST /api/workflows/{id}/steps
+Content-Type: application/json
+
+{
+  "integration_key": "google.gmail",
+  "action_key": "create_label",
+  "connection_id": 1,
+  "config": {
+    "name": "E2E-MultiLabel"
+  }
+}
+```
+
+Runtime output:
+
+```json
+{
+  "created": true,
+  "label_id": "Label_1",
+  "name": "E2E-MultiLabel"
+}
+```
+
+The key we will reference later is `label_id`.
+
+**Step 2 — apply the label, referencing step 1's output**
+
+```
+POST /api/workflows/{id}/steps
+Content-Type: application/json
+
+{
+  "integration_key": "google.gmail",
+  "action_key": "add_label",
+  "connection_id": 1,
+  "config": {
+    "message_id": "{{ trigger.message_id }}",
+    "label_id": "{{ steps.1.output.label_id }}"
+  }
+}
+```
+
+At runtime, `{{ steps.1.output.label_id }}` resolves to the string
+`"Label_1"`. The step's persisted output is:
+
+```json
+{
+  "modified": true,
+  "message_id": "1a101e9eaca9df54",
+  "label_id": "Label_1"
+}
+```
+
+**Step 3 — mark the message as unread**
+
+```
+{
+  "integration_key": "google.gmail",
+  "action_key": "mark_as_unread",
+  "connection_id": 1,
+  "config": {
+    "message_id": "{{ trigger.message_id }}"
+  }
+}
+```
+
+**Step 4 — mark the message as read**
+
+```
+{
+  "integration_key": "google.gmail",
+  "action_key": "mark_as_read",
+  "connection_id": 1,
+  "config": {
+    "message_id": "{{ trigger.message_id }}"
+  }
+}
+```
+
+Steps 3 and 4 exercise the read-state flip on the same message. Order matters:
+step 3 runs before step 4, so the final state is "read".
+
+**Step 5 — remove the label, referencing step 1's output again**
+
+```
+{
+  "integration_key": "google.gmail",
+  "action_key": "remove_label",
+  "connection_id": 1,
+  "config": {
+    "message_id": "{{ trigger.message_id }}",
+    "label_id": "{{ steps.1.output.label_id }}"
+  }
+}
+```
+
+Same `{{ steps.1.output.label_id }}` reference. The value is stable across
+the execution — it is the same `label_id` that step 1 returned.
+
+**Step 6 — archive the message**
+
+```
+{
+  "integration_key": "google.gmail",
+  "action_key": "archive",
+  "connection_id": 1,
+  "config": {
+    "message_id": "{{ trigger.message_id }}"
+  }
+}
+```
+
+**Step 7 — move the message to trash**
+
+```
+{
+  "integration_key": "google.gmail",
+  "action_key": "trash",
+  "connection_id": 1,
+  "config": {
+    "message_id": "{{ trigger.message_id }}"
+  }
+}
+```
+
+**Full workflow after all 7 steps are added** (response from
+`GET /api/workflows/{id}`):
+
+```json
+{
+  "id": 5,
+  "name": "E2E Multi-Action Workflow",
+  "status": "draft",
+  "trigger": {
+    "id": 6,
+    "integration_key": "google.gmail",
+    "trigger_key": "new_email_received",
+    "connection_id": 1,
+    "strategy": "poll",
+    "config": {
+      "subject": "E2E-Multi",
+      "label_id": "INBOX"
+    },
+    "interval_minutes": null
+  },
+  "steps": [
+    {
+      "id": 7,
+      "position": 1,
+      "integration_key": "google.gmail",
+      "action_key": "create_label",
+      "connection_id": 1,
+      "config": { "name": "E2E-MultiLabel" }
+    },
+    {
+      "id": 8,
+      "position": 2,
+      "integration_key": "google.gmail",
+      "action_key": "add_label",
+      "connection_id": 1,
+      "config": {
+        "label_id": "{{ steps.1.output.label_id }}",
+        "message_id": "{{ trigger.message_id }}"
+      }
+    },
+    {
+      "id": 9,
+      "position": 3,
+      "integration_key": "google.gmail",
+      "action_key": "mark_as_unread",
+      "connection_id": 1,
+      "config": { "message_id": "{{ trigger.message_id }}" }
+    },
+    {
+      "id": 10,
+      "position": 4,
+      "integration_key": "google.gmail",
+      "action_key": "mark_as_read",
+      "connection_id": 1,
+      "config": { "message_id": "{{ trigger.message_id }}" }
+    },
+    {
+      "id": 11,
+      "position": 5,
+      "integration_key": "google.gmail",
+      "action_key": "remove_label",
+      "connection_id": 1,
+      "config": {
+        "label_id": "{{ steps.1.output.label_id }}",
+        "message_id": "{{ trigger.message_id }}"
+      }
+    },
+    {
+      "id": 12,
+      "position": 6,
+      "integration_key": "google.gmail",
+      "action_key": "archive",
+      "connection_id": 1,
+      "config": { "message_id": "{{ trigger.message_id }}" }
+    },
+    {
+      "id": 13,
+      "position": 7,
+      "integration_key": "google.gmail",
+      "action_key": "trash",
+      "connection_id": 1,
+      "config": { "message_id": "{{ trigger.message_id }}" }
+    }
+  ]
+}
+```
+
+**Execution result** (all 7 steps, from `GET /api/executions/{id}`):
+
+```json
+{
+  "status": "completed",
+  "trigger_source": "poll",
+  "steps": [
+    {
+      "position": 1,
+      "action_key": "create_label",
+      "status": "completed",
+      "output": {
+        "created": true,
+        "label_id": "Label_1",
+        "name": "E2E-MultiLabel"
+      }
+    },
+    {
+      "position": 2,
+      "action_key": "add_label",
+      "status": "completed",
+      "output": {
+        "modified": true,
+        "message_id": "1a101e9eaca9df54",
+        "label_id": "Label_1"
+      }
+    },
+    {
+      "position": 3,
+      "action_key": "mark_as_unread",
+      "status": "completed",
+      "output": {
+        "modified": true,
+        "message_id": "1a101e9eaca9df54"
+      }
+    },
+    {
+      "position": 4,
+      "action_key": "mark_as_read",
+      "status": "completed",
+      "output": {
+        "modified": true,
+        "message_id": "1a101e9eaca9df54"
+      }
+    },
+    {
+      "position": 5,
+      "action_key": "remove_label",
+      "status": "completed",
+      "output": {
+        "modified": true,
+        "message_id": "1a101e9eaca9df54",
+        "label_id": "Label_1"
+      }
+    },
+    {
+      "position": 6,
+      "action_key": "archive",
+      "status": "completed",
+      "output": {
+        "modified": true,
+        "message_id": "1a101e9eaca9df54"
+      }
+    },
+    {
+      "position": 7,
+      "action_key": "trash",
+      "status": "completed",
+      "output": {
+        "modified": true,
+        "message_id": "1a101e9eaca9df54"
+      }
+    }
+  ]
+}
+```
+
+**What this example demonstrates for mobile:**
+
+- A workflow can have many steps.
+- Later steps can reference earlier steps' outputs by position and key.
+- The referenced output key (`label_id`) is stable and its value is
+  identical across steps 2 and 5.
+- The resolved value type is preserved — step 1's `label_id` is a string, and
+  step 2's resolved `label_id` is also a string.
+- Mobile does not need any special coordination for these references. It
+  constructs the `config` object with the literal template string
+  `"{{ steps.1.output.label_id }}"`, submits it via the normal step
+  endpoint, and the backend handles resolution at execution time.
+
+**How mobile should build this in the UI:**
+
+1. When the user adds step 1 (`create_label`), mobile can look up the action's
+   output keys in the table in §5.9. The user does not configure any output —
+   outputs are produced by the backend at runtime.
+2. When the user adds step 2, and selects an action whose `config` has a
+   `label_id` field, mobile can offer the user a dropdown of "referenceable
+   values" composed from:
+    - The trigger's payload keys (from the trigger definition in the catalog).
+    - The output keys of every earlier step in the same workflow (from the
+      table in §5.9).
+3. When the user picks "Label from step 1", mobile writes the literal string
+   `"{{ steps.1.output.label_id }}"` into the step's `config.label_id`.
+
+The backend has no per-workflow opt-in or registration for these references —
+they are simply strings inside `config`, resolved at runtime.
+
+### 5.19 Additional worked example — the hero test
+
+The hero test verified end-to-end during the Gmail E2E Verification Pass:
+
+```
+Trigger: new_email_received  (filter: subject contains "E2E-Hero", label INBOX)
+Step 1:  mark_as_read    with message_id = {{ trigger.message_id }}
+Step 2:  reply_to_email  with to         = {{ trigger.from }},
+                          subject    = "Re: {{ trigger.subject }}",
+                          body       = "<p>Thanks for reaching out...</p>",
+                          thread_id  = {{ trigger.thread_id }}
+```
+
+Result on real Gmail:
+
+- The incoming message was marked read.
+- A reply landed in the **same conversation thread** as the incoming message.
+- Both steps returned `completed`.
+
+This example demonstrates the mix of `{{ trigger.* }}` references (four
+distinct ones in step 2) and a simple single-action step 1.
 
 ---
 
@@ -916,7 +1539,7 @@ Why labels are separate from the catalog:
 
 **No Gmail-specific hardcoding in the mobile app.** The mobile app reads `options_source` and resolves it declaratively.
 
-Label mutation (create/update/delete) is **not implemented**. The `gmail.labels` scope is **not** part of consent. Push / Pub/Sub / `historyId` cursors are **not implemented**.
+Label mutation (create/update/delete) is **not implemented as an HTTP endpoint**. The `gmail.labels` scope is part of Gmail capability consent. Push / Pub/Sub / `historyId` cursors are **not implemented**.
 
 ---
 
@@ -971,6 +1594,22 @@ Used for both "does not exist" and "belongs to another user". Mobile must not at
 
 Google provider failures from the integration endpoints (Gmail send, Calendar, Sheets, Docs, Analytics, labels) surface as HTTP 500 with a JSON body containing at least a `message` field. These are not meant to be interpreted field-by-field by the mobile client; treat them as retriable transient errors at the workflow-step level.
 
+### 7.7 Step template resolution failures
+
+When a `{{ trigger.* }}` or `{{ steps.N.output.* }}` reference cannot be resolved at execution time, the step is marked `failed` and the execution status becomes `failed`. The step's `error_message` contains a descriptive string, for example:
+
+```
+Template path "trigger.message_id" cannot be resolved.
+```
+
+or
+
+```
+Template path "steps.2.output.label_id" cannot be resolved.
+```
+
+These are not HTTP errors — the workflow execution itself returns `200`/`201` with the execution object, and the failure is recorded on the execution and step records. Mobile must inspect `data.status` and `data.steps[].status`, not just the HTTP status code, to detect this class of failure.
+
 ---
 
 ## 8. Mobile end-to-end example (Gmail auto-reply)
@@ -987,7 +1626,10 @@ GET /api/connections
 Authorization: Bearer <token>
 ```
 
-Pick `connection_id = 12` from `data[]`.
+Pick `connection_id = 12` from `data[]`. Verify its `scopes` array contains
+`https://www.googleapis.com/auth/gmail.send` (for `send_email` /
+`reply_to_email`) or the relevant `gmail.*` scope for the action the user
+intends to configure. If not, prompt the user to reconnect.
 
 Step 2 — Fetch catalog
 
@@ -1059,23 +1701,62 @@ Body (Case B — no label):
 }
 ```
 
-Step 6 — Add Gmail send_email step
+Optional trigger filters can be added alongside `label_id` (or alone):
 
-Read `catalog.integrations[google.gmail].actions[send_email].config` for the field list. Then:
+```
+PUT /api/workflows/42/trigger
+Body (with extra filters):
+{
+  "integration_key": "google.gmail",
+  "trigger_key": "new_email_received",
+  "connection_id": 12,
+  "config": {
+    "label_id": "INBOX",
+    "from": "vip@example.com",
+    "subject": "Invoice paid",
+    "has_attachment": true,
+    "query": "is:unread"
+  }
+}
+```
+
+Step 6 — Add Gmail step
+
+Read `catalog.integrations[google.gmail].actions[<action_key>].config` for the
+field list. Two common examples:
+
+Simple reply step:
 
 ```
 POST /api/workflows/42/steps
 Body: {
   "integration_key": "google.gmail",
-  "action_key": "send_email",
+  "action_key": "reply_to_email",
   "connection_id": 12,
   "config": {
     "to": "{{ trigger.from }}",
     "subject": "Re: {{ trigger.subject }}",
-    "body": "<p>Auto-reply</p>"
+    "body": "<p>Auto-reply</p>",
+    "thread_id": "{{ trigger.thread_id }}"
   }
 }
 ```
+
+Simple archive step:
+
+```
+POST /api/workflows/42/steps
+Body: {
+  "integration_key": "google.gmail",
+  "action_key": "archive",
+  "connection_id": 12,
+  "config": {
+    "message_id": "{{ trigger.message_id }}"
+  }
+}
+```
+
+For a multi-step workflow with inter-step references, see §5.18.
 
 Step 7 — Activate workflow
 
@@ -1083,7 +1764,7 @@ Step 7 — Activate workflow
 POST /api/workflows/42/activate
 ```
 
-Expect HTTP 200 with `data.status = "active"`. On HTTP 409, inspect the structured error and adjust.
+Expect HTTP 200 with `data.status = "active"`. On HTTP 409, inspect the structured error and adjust. `error: "missing_scopes"` means the connection must be reconnected.
 
 Step 8 — Manual execution (optional, for testing)
 
@@ -1179,6 +1860,12 @@ Non-production:
 
 - `POST /api/test/login` — dev-only.
 
+The ten Gmail actions (`send_email`, `reply_to_email`, `create_draft`,
+`mark_as_read`, `mark_as_unread`, `archive`, `trash`, `add_label`,
+`remove_label`, `create_label`) are not standalone HTTP endpoints. They are
+executed through the generic workflow step API (`POST /api/workflows/{id}/steps`
+with `integration_key = "google.gmail"` and the corresponding `action_key`).
+
 ---
 
 ## 11. Deferred functionality Mobile must not depend on
@@ -1188,10 +1875,10 @@ Non-production:
 - Refresh-token / long-lived token policy. Not implemented.
 - Per-device token revocation. Not implemented.
 - `requires_connection` catalog flag. Not implemented.
+- **Catalog-level output schema declaration.** The catalog exposes action inputs only. Output keys are documented in §5.9 of this contract. There is currently no `outputSchema` field in the catalog response — mobile must hardcode the output keys from §5.9 for Gmail actions, and must not assume any output keys for Calendar / Sheets / Docs / Analytics.
 - Field metadata for Calendar / Sheets / Docs / Analytics actions. Not implemented.
-- Runtime handlers for `reply_to_email` and `create_draft` (and all non-Gmail actions). Not implemented.
-- Gmail label mutation / `gmail.labels` capability. Not implemented.
-- Gmail attachment byte retrieval. Not implemented.
+- Runtime handlers for Calendar / Sheets / Docs / Analytics workflow step actions. Not implemented.
+- Gmail attachment byte retrieval. Deferred until the Drive/storage architecture exists. Only metadata (`has_attachment`, `attachment_count`, `attachment_ids`) is available.
 - Gmail Push (`users.watch`), Google Pub/Sub, `historyId` cursors. Not implemented.
 - Retry / DLQ infrastructure. Not implemented.
 - Catalog caching / ETag / multi-endpoint catalog. Not implemented.
@@ -1218,6 +1905,11 @@ A: Three:
 
 All three return a Sanctum bearer token, which the mobile client uses identically.
 
+**Q: Can a workflow have multiple steps that reference each other?**
+
+A: Yes. Steps can reference an earlier step's output via `{{ steps.N.output.<key> }}`, where `N` is the 1-based position of an earlier step in the same workflow. The referenced `<key>` must be one of the keys that the earlier step's action actually returns. The verified output keys for all Gmail actions are listed in §5.9. A full worked example is in §5.18. Whole-template resolution preserves the resolved value's type; invalid or future-step references fail the step at runtime with a descriptive `error_message`.
+
 **Q: Can the Mobile Developer start integrating tomorrow?**
 
-A: Yes. Use `/api/login` for users who have email/password credentials, or the Google OAuth flow for users who sign in with Google. Every endpoint needed to build the automation UI is present, authenticated, and owner-scoped. The Catalog now uses the same canonical identifiers as the Workflow API, so no client-side mapping layer is required. See §5.7 for the one config-handling pitfall (`label_id`) that must be handled correctly on the mobile side.
+A: Yes. Use `/api/login` for users who have email/password credentials, or the Google OAuth flow for users who sign in with Google. Every endpoint needed to build the automation UI is present, authenticated, and owner-scoped. The Catalog uses the same canonical identifiers as the Workflow API, so no client-side mapping layer is required. See §5.7 for the one config-handling pitfall (`label_id`) that must be handled correctly on the mobile side. See §3.5 for the Gmail reconnect requirement when the user wants to use the newer Gmail actions. See §5.9 for the verified output keys per Gmail action, and §5.17 and §5.18 for how to build multi-step workflows with `{{ steps.N.output.* }}` references.
+

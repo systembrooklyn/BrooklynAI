@@ -37,8 +37,11 @@ class CatalogActionInvokerTest extends TestCase
         $this->expectException(ActionInvocationFailed::class);
         $this->expectExceptionMessage('No handler registered');
 
-        // `google.gmail.reply_to_email` is declared in the catalog but
-        // intentionally has no handler wired in Batch 6.4.
-        $this->invoker->invoke('google.gmail', 'reply_to_email', 1, null, []);
+        // `google.calendar.create_event` is declared in the catalog but
+        // intentionally has no runtime handler yet.
+        // (reply_to_email and create_draft used to be the missing-handler
+        //  exemplars but now have real handlers, so a Calendar action takes
+        //  their place.)
+        $this->invoker->invoke('google.calendar', 'create_event', 1, null, []);
     }
 }

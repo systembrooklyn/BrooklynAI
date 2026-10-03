@@ -13,6 +13,7 @@ use App\Modules\Execution\Infrastructure\Jobs\RunWorkflowJob;
 use App\Modules\Integrations\Application\Actions\FetchGmailTriggerMessagesAction;
 use App\Modules\Integrations\Application\DTOs\FetchGmailTriggerMessagesInput;
 use App\Modules\Integrations\Core\Exceptions\GmailProviderException;
+use App\Modules\Integrations\Infrastructure\Google\Gmail\GmailTriggerQueryComposer;
 use DateTimeImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -50,6 +51,7 @@ final class PollGmailCommand extends Command
         ExecutionRepository $executions,
         FetchGmailTriggerMessagesAction $fetch,
         ConnectionRepository $connections,
+        GmailTriggerQueryComposer $queryComposer,
     ): int {
         $now = new DateTimeImmutable;
 
@@ -68,7 +70,7 @@ final class PollGmailCommand extends Command
             $trigger = $pair['trigger'];
             $processed++;
 
-            $lock = Cache::lock('poll-trigger:' . $trigger->id, self::LOCK_SECONDS);
+            $lock = Cache::lock('poll-trigger:'.$trigger->id, self::LOCK_SECONDS);
             if (! $lock->get()) {
                 $skipped++;
                 $this->line(sprintf('Workflow %d: skipped (locked by another poller)', $workflow->id));
@@ -85,6 +87,7 @@ final class PollGmailCommand extends Command
                     $connections,
                     $workflows,
                     $now,
+                    $queryComposer,
                 );
 
                 if ($outcome === 'executed') {
@@ -100,7 +103,7 @@ final class PollGmailCommand extends Command
                     continue;
                 }
                 throw $e;
-            } catch (GoogleCredentialsUnavailableException | ConnectionNotFoundException $e) {
+            } catch (GoogleCredentialsUnavailableException|ConnectionNotFoundException $e) {
                 $skipped++;
                 $this->warn(sprintf('Workflow %d: %s', $workflow->id, $e->getMessage()));
             } finally {
@@ -121,6 +124,7 @@ final class PollGmailCommand extends Command
         ConnectionRepository $connections,
         WorkflowRepository $workflows,
         DateTimeImmutable $now,
+        GmailTriggerQueryComposer $queryComposer,
     ): string {
         if ($executions->hasInProgressForWorkflow((int) $workflow->id)) {
             $this->line(sprintf('Workflow %d: skipped (execution in progress)', $workflow->id));
@@ -147,6 +151,8 @@ final class PollGmailCommand extends Command
             return 'skipped';
         }
 
+        $query = $queryComposer->compose($trigger->config);
+
         $after = max($trigger->pollCursor - self::OVERLAP_SECONDS, 0);
 
         $fetched = $fetch->execute(new FetchGmailTriggerMessagesInput(
@@ -154,6 +160,7 @@ final class PollGmailCommand extends Command
             connectionId: $trigger->connectionId,
             afterEpochSeconds: $after,
             labelIds: $labelIds,
+            query: $query,
         ));
 
         $maxSeenSeconds = $this->maxSeenSeconds($fetched);
@@ -181,14 +188,14 @@ final class PollGmailCommand extends Command
             return $c !== 0 ? $c : strcmp((string) $a['message_id'], (string) $b['message_id']);
         });
 
-        $rateKey = 'workflow-exec:' . $workflow->id;
+        $rateKey = 'workflow-exec:'.$workflow->id;
         $rateLimit = (int) config('automation.execution_rate_limit_per_minute', self::DEFAULT_RATE_LIMIT);
 
         $dispatched = 0;
 
         foreach ($payloads as $payload) {
             $messageId = (string) $payload['message_id'];
-            $idempotencyKey = 'gmail:' . $workflow->id . ':' . $messageId;
+            $idempotencyKey = 'gmail:'.$workflow->id.':'.$messageId;
 
             if ($executions->findByIdempotencyKey((int) $workflow->id, $idempotencyKey) !== null) {
                 continue;
@@ -306,9 +313,12 @@ final class PollGmailCommand extends Command
             $interval = self::DEFAULT_INTERVAL_MINUTES;
         }
 
-        return $now->modify('+' . $interval . ' minutes');
+        return $now->modify('+'.$interval.' minutes');
     }
 
+    /**
+     * @return array<int, string>|null
+     */
     private function extractLabelIds(WorkflowTrigger $trigger): ?array
     {
         $config = $trigger->config;

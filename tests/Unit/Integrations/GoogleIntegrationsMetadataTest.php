@@ -83,11 +83,24 @@ class GoogleIntegrationsMetadataTest extends TestCase
     {
         $gmail = $this->catalog()->require('google.gmail');
 
-        $actionKeys = array_map(static fn ($a) => $a->key, $gmail->actions);
+        $actionKeys = array_map(static fn($a) => $a->key, $gmail->actions);
         sort($actionKeys);
-        $this->assertSame(['create_draft', 'reply_to_email', 'send_email'], $actionKeys);
-
-        $triggerKeys = array_map(static fn ($t) => $t->key, $gmail->triggers);
+        $this->assertSame(
+            [
+                'add_label',
+                'archive',
+                'create_draft',
+                'create_label',
+                'mark_as_read',
+                'mark_as_unread',
+                'remove_label',
+                'reply_to_email',
+                'send_email',
+                'trash',
+            ],
+            $actionKeys,
+        );
+        $triggerKeys = array_map(static fn($t) => $t->key, $gmail->triggers);
         $this->assertSame(['new_email_received'], $triggerKeys);
     }
 
@@ -95,7 +108,7 @@ class GoogleIntegrationsMetadataTest extends TestCase
     {
         $calendar = $this->catalog()->require('google.calendar');
 
-        $actionKeys = array_map(static fn ($a) => $a->key, $calendar->actions);
+        $actionKeys = array_map(static fn($a) => $a->key, $calendar->actions);
         sort($actionKeys);
 
         $this->assertSame(
@@ -108,7 +121,7 @@ class GoogleIntegrationsMetadataTest extends TestCase
     {
         $sheets = $this->catalog()->require('google.sheets');
 
-        $actionKeys = array_map(static fn ($a) => $a->key, $sheets->actions);
+        $actionKeys = array_map(static fn($a) => $a->key, $sheets->actions);
         sort($actionKeys);
 
         $this->assertSame(
@@ -131,7 +144,7 @@ class GoogleIntegrationsMetadataTest extends TestCase
     {
         $docs = $this->catalog()->require('google.docs');
 
-        $actionKeys = array_map(static fn ($a) => $a->key, $docs->actions);
+        $actionKeys = array_map(static fn($a) => $a->key, $docs->actions);
         sort($actionKeys);
 
         $this->assertSame(
@@ -152,7 +165,7 @@ class GoogleIntegrationsMetadataTest extends TestCase
     {
         $analytics = $this->catalog()->require('google.analytics');
 
-        $actionKeys = array_map(static fn ($a) => $a->key, $analytics->actions);
+        $actionKeys = array_map(static fn($a) => $a->key, $analytics->actions);
         sort($actionKeys);
 
         $this->assertSame(

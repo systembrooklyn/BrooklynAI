@@ -19,17 +19,22 @@ class GmailMessageReader
         ResolvedGoogleCredentials $credentials,
         int $afterEpochSeconds,
         array $labelIds = [],
+        ?string $query = null,
     ): array {
         $service = $this->createService($credentials);
 
-        $query = 'after:'.max($afterEpochSeconds, 0);
+        $baseQuery = 'after:'.max($afterEpochSeconds, 0);
+
+        $fullQuery = ($query !== null && trim($query) !== '')
+            ? $baseQuery.' '.trim($query)
+            : $baseQuery;
 
         $ids = [];
         $pageToken = null;
 
         do {
             $params = [
-                'q' => $query,
+                'q' => $fullQuery,
                 'maxResults' => 500,
             ];
 

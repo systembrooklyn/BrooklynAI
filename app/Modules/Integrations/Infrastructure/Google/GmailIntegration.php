@@ -65,6 +65,36 @@ final class GmailIntegration implements IntegrationProvider
                         ScopeIdentifier::fromString('https://www.googleapis.com/auth/gmail.send'),
                     ],
                     capability: 'gmail',
+                    fields: [
+                        new FieldDefinition(
+                            key: 'to',
+                            label: 'To',
+                            type: 'email',
+                            required: true,
+                            description: 'Recipient email address. Typically the sender of the original email: {{ trigger.from }}.',
+                        ),
+                        new FieldDefinition(
+                            key: 'subject',
+                            label: 'Subject',
+                            type: 'string',
+                            required: true,
+                            description: 'Reply subject. Typically "Re: " followed by the original subject: Re: {{ trigger.subject }}.',
+                        ),
+                        new FieldDefinition(
+                            key: 'body',
+                            label: 'Body',
+                            type: 'text',
+                            required: true,
+                            description: 'Reply body.',
+                        ),
+                        new FieldDefinition(
+                            key: 'thread_id',
+                            label: 'Thread ID',
+                            type: 'string',
+                            required: true,
+                            description: 'Gmail thread ID. Typically {{ trigger.thread_id }}.',
+                        ),
+                    ],
                 ),
                 new ActionDefinition(
                     key: 'create_draft',
@@ -74,6 +104,174 @@ final class GmailIntegration implements IntegrationProvider
                         ScopeIdentifier::fromString('https://www.googleapis.com/auth/gmail.compose'),
                     ],
                     capability: 'gmail',
+                    fields: [
+                        new FieldDefinition(
+                            key: 'to',
+                            label: 'To',
+                            type: 'email',
+                            required: true,
+                        ),
+                        new FieldDefinition(
+                            key: 'subject',
+                            label: 'Subject',
+                            type: 'string',
+                            required: true,
+                        ),
+                        new FieldDefinition(
+                            key: 'body',
+                            label: 'Body',
+                            type: 'text',
+                            required: true,
+                        ),
+                    ],
+                ),
+                new ActionDefinition(
+                    key: 'mark_as_read',
+                    label: 'Mark as Read',
+                    description: 'Mark an email message as read.',
+                    requiredScopes: [
+                        ScopeIdentifier::fromString('https://www.googleapis.com/auth/gmail.modify'),
+                    ],
+                    capability: 'gmail',
+                    fields: [
+                        new FieldDefinition(
+                            key: 'message_id',
+                            label: 'Message ID',
+                            type: 'string',
+                            required: true,
+                            description: 'Gmail message ID. Typically {{ trigger.message_id }}.',
+                        ),
+                    ],
+                ),
+                new ActionDefinition(
+                    key: 'mark_as_unread',
+                    label: 'Mark as Unread',
+                    description: 'Mark an email message as unread.',
+                    requiredScopes: [
+                        ScopeIdentifier::fromString('https://www.googleapis.com/auth/gmail.modify'),
+                    ],
+                    capability: 'gmail',
+                    fields: [
+                        new FieldDefinition(
+                            key: 'message_id',
+                            label: 'Message ID',
+                            type: 'string',
+                            required: true,
+                            description: 'Gmail message ID. Typically {{ trigger.message_id }}.',
+                        ),
+                    ],
+                ),
+                new ActionDefinition(
+                    key: 'archive',
+                    label: 'Archive Email',
+                    description: 'Remove an email message from the inbox.',
+                    requiredScopes: [
+                        ScopeIdentifier::fromString('https://www.googleapis.com/auth/gmail.modify'),
+                    ],
+                    capability: 'gmail',
+                    fields: [
+                        new FieldDefinition(
+                            key: 'message_id',
+                            label: 'Message ID',
+                            type: 'string',
+                            required: true,
+                            description: 'Gmail message ID. Typically {{ trigger.message_id }}.',
+                        ),
+                    ],
+                ),
+                new ActionDefinition(
+                    key: 'trash',
+                    label: 'Move to Trash',
+                    description: 'Move an email message to the trash.',
+                    requiredScopes: [
+                        ScopeIdentifier::fromString('https://www.googleapis.com/auth/gmail.modify'),
+                    ],
+                    capability: 'gmail',
+                    fields: [
+                        new FieldDefinition(
+                            key: 'message_id',
+                            label: 'Message ID',
+                            type: 'string',
+                            required: true,
+                            description: 'Gmail message ID. Typically {{ trigger.message_id }}.',
+                        ),
+                    ],
+                ),
+                new ActionDefinition(
+                    key: 'add_label',
+                    label: 'Add Label',
+                    description: 'Add a Gmail label to an email message.',
+                    requiredScopes: [
+                        ScopeIdentifier::fromString('https://www.googleapis.com/auth/gmail.modify'),
+                    ],
+                    capability: 'gmail',
+                    fields: [
+                        new FieldDefinition(
+                            key: 'message_id',
+                            label: 'Message ID',
+                            type: 'string',
+                            required: true,
+                            description: 'Gmail message ID. Typically {{ trigger.message_id }}.',
+                        ),
+                        new FieldDefinition(
+                            key: 'label_id',
+                            label: 'Label',
+                            type: 'select',
+                            required: true,
+                            description: 'Gmail label ID to add.',
+                            options_source: [
+                                'operation_id' => 'gmail.labels',
+                                'params' => ['connection_id' => '{{connection_id}}'],
+                            ],
+                        ),
+                    ],
+                ),
+                new ActionDefinition(
+                    key: 'remove_label',
+                    label: 'Remove Label',
+                    description: 'Remove a Gmail label from an email message.',
+                    requiredScopes: [
+                        ScopeIdentifier::fromString('https://www.googleapis.com/auth/gmail.modify'),
+                    ],
+                    capability: 'gmail',
+                    fields: [
+                        new FieldDefinition(
+                            key: 'message_id',
+                            label: 'Message ID',
+                            type: 'string',
+                            required: true,
+                            description: 'Gmail message ID. Typically {{ trigger.message_id }}.',
+                        ),
+                        new FieldDefinition(
+                            key: 'label_id',
+                            label: 'Label',
+                            type: 'select',
+                            required: true,
+                            description: 'Gmail label ID to remove.',
+                            options_source: [
+                                'operation_id' => 'gmail.labels',
+                                'params' => ['connection_id' => '{{connection_id}}'],
+                            ],
+                        ),
+                    ],
+                ),
+                new ActionDefinition(
+                    key: 'create_label',
+                    label: 'Create Label',
+                    description: 'Create a new Gmail label.',
+                    requiredScopes: [
+                        ScopeIdentifier::fromString('https://www.googleapis.com/auth/gmail.labels'),
+                    ],
+                    capability: 'gmail',
+                    fields: [
+                        new FieldDefinition(
+                            key: 'name',
+                            label: 'Label Name',
+                            type: 'string',
+                            required: true,
+                            description: 'The name of the new Gmail label.',
+                        ),
+                    ],
                 ),
             ],
             triggers: [
@@ -92,10 +290,39 @@ final class GmailIntegration implements IntegrationProvider
                             label: 'Label',
                             type: 'select',
                             required: false,
+                            description: 'Only trigger for emails with this Gmail label. Leave empty to match all mail.',
                             options_source: [
                                 'operation_id' => 'gmail.labels',
                                 'params' => ['connection_id' => '{{connection_id}}'],
                             ],
+                        ),
+                        new FieldDefinition(
+                            key: 'from',
+                            label: 'From',
+                            type: 'string',
+                            required: false,
+                            description: 'Only trigger for emails whose sender matches this filter. Uses Gmail search syntax (for example user@example.com).',
+                        ),
+                        new FieldDefinition(
+                            key: 'subject',
+                            label: 'Subject',
+                            type: 'string',
+                            required: false,
+                            description: 'Only trigger for emails whose subject matches this filter. Multi-word values are matched as a phrase.',
+                        ),
+                        new FieldDefinition(
+                            key: 'has_attachment',
+                            label: 'Has Attachment',
+                            type: 'boolean',
+                            required: false,
+                            description: 'Only trigger for emails that carry an attachment.',
+                        ),
+                        new FieldDefinition(
+                            key: 'query',
+                            label: 'Advanced Query',
+                            type: 'string',
+                            required: false,
+                            description: 'Optional raw Gmail search query, for example "is:unread larger:5M". Advanced users only.',
                         ),
                     ],
                 ),

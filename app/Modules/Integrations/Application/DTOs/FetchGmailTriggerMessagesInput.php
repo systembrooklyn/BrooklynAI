@@ -12,5 +12,6 @@ final class FetchGmailTriggerMessagesInput
         public readonly ?int $connectionId,
         public readonly int $afterEpochSeconds,
         public readonly array $labelIds = [],
+        public readonly ?string $query = null,
     ) {}
 }
