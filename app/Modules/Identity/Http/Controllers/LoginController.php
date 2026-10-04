@@ -19,12 +19,12 @@ class LoginController extends Controller
 
         if ($result === null) {
             return response()->json([
-                'message' => 'Invalid credentials.',
+                'message' => __('identity::messages.invalid_credentials'),
             ], 401);
         }
 
         return response()->json([
-            'message' => 'Login successful.',
+            'message' => __('identity::messages.login_success'),
             'data' => $result,
         ]);
     }

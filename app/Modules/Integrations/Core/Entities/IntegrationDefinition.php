@@ -20,5 +20,7 @@ final class IntegrationDefinition
         public readonly AuthDefinition $auth,
         public readonly array $actions = [],
         public readonly array $triggers = [],
+        public readonly ?string $nameKey = null,
+        public readonly ?string $descriptionKey = null,
     ) {}
 }

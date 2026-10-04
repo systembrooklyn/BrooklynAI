@@ -26,16 +26,20 @@ class ListGmailLabelsController extends Controller
             ));
 
             return response()->json([
-                'message' => 'Labels retrieved successfully.',
+                'message' => __('integrations::messages.labels_retrieved'),
                 'data' => $labels,
             ]);
         } catch (ConnectionNotFoundException) {
-            return response()->json(['message' => 'Connection not found'], 404);
+            return response()->json([
+                'message' => __('integrations::messages.connection_not_found'),
+            ], 404);
         } catch (GoogleCredentialsUnavailableException) {
-            return response()->json(['message' => 'Google credentials unavailable'], 500);
+            return response()->json([
+                'message' => __('integrations::messages.google_credentials_unavailable'),
+            ], 500);
         } catch (GmailProviderException $e) {
             return response()->json([
-                'message' => 'Failed to retrieve Gmail labels',
+                'message' => __('integrations::messages.labels_retrieval_failed'),
                 'error' => $e->getMessage(),
             ], 500);
         }

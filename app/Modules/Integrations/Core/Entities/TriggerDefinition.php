@@ -20,5 +20,7 @@ final class TriggerDefinition
         public readonly array $requiredScopes = [],
         public readonly ?string $capability = null,
         public readonly array $fields = [],
+        public readonly ?string $labelKey = null,
+        public readonly ?string $descriptionKey = null,
     ) {}
 }

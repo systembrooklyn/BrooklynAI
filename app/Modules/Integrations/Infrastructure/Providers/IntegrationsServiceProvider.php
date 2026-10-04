@@ -33,6 +33,8 @@ class IntegrationsServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadTranslationsFrom(__DIR__.'/../../Lang', 'integrations');
+
         Route::middleware('api')
             ->group(__DIR__.'/../../Http/Routes/api.php');
     }

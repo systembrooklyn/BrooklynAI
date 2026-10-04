@@ -12,7 +12,7 @@ class CatalogController extends Controller
     public function __invoke(Request $request, CatalogProjector $projector): JsonResponse
     {
         return response()->json([
-            'message' => 'Catalog retrieved successfully',
+            'message' => __('integrations::messages.catalog_retrieved'),
             'data' => $projector->project(),
         ]);
     }

@@ -38,28 +38,30 @@ class UpdateCalendarEventController extends Controller
             ));
 
             return response()->json([
-                'message' => 'Event updated successfully',
+                'message' => __('integrations::messages.event_updated'),
                 'data' => new GCalenderEventResource($event),
             ]);
         } catch (ConnectionNotFoundException) {
             return response()->json([
-                'message' => 'Connection not found',
+                'message' => __('integrations::messages.connection_not_found'),
             ], 404);
         } catch (\Google\Service\Exception $e) {
             $error = json_decode($e->getMessage(), true);
             $status = $e->getCode();
 
             if ($status == 404) {
-                return response()->json(['error' => 'Event not found'], 404);
+                return response()->json([
+                    'error' => __('integrations::messages.event_not_found'),
+                ], 404);
             }
 
             return response()->json([
-                'error' => 'Failed to update event',
+                'error' => __('integrations::messages.event_update_failed'),
                 'message' => $error['error']['message'] ?? 'Unknown error',
             ], $status);
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Server error',
+                'error' => __('integrations::messages.server_error'),
                 'message' => $e->getMessage(),
             ], 500);
         }

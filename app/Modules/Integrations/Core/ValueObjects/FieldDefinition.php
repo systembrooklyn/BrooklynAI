@@ -17,5 +17,7 @@ final class FieldDefinition
         public readonly mixed $default = null,
         public readonly ?array $options = null,
         public readonly ?array $options_source = null,
+        public readonly ?string $labelKey = null,
+        public readonly ?string $descriptionKey = null,
     ) {}
 }

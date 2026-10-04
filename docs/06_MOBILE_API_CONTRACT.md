@@ -2,8 +2,8 @@
 
 Status: read-only contract derived from the currently implemented API.
 
-Version: 1.0.6
-Last updated: after Gmail E2E Verification Pass.
+Version: 1.0.7
+Last updated: after Localization (Batches 1–4).
 
 This document is written for the mobile developer. It describes only behavior that exists in the backend today. Anything not present in the code is explicitly marked NOT IMPLEMENTED or DEFERRED.
 
@@ -1882,10 +1882,124 @@ with `integration_key = "google.gmail"` and the corresponding `action_key`).
 - Gmail Push (`users.watch`), Google Pub/Sub, `historyId` cursors. Not implemented.
 - Retry / DLQ infrastructure. Not implemented.
 - Catalog caching / ETag / multi-endpoint catalog. Not implemented.
+- Project-supplied `lang/{locale}/validation.php` overrides. As of this contract version, only the framework default `en` translations are guaranteed. Per-field 422 messages for locales other than `en` fall back to the framework default until project overrides are added.
 
 ---
 
-## 12. Final answers
+## 12. Localization
+
+### 12.1 Supported locales
+
+- `en` — English (default, fallback).
+- `ar` — Arabic.
+
+Any other value is ignored by the server.
+
+### 12.2 Mechanism
+
+The only client-facing locale mechanism is the standard `Accept-Language`
+request header.
+
+- Regional variants are normalized: `en-US`, `en-GB` → `en`; `ar-EG`, `ar-SA` → `ar`.
+- Candidate languages are ordered by their `q` value.
+- Candidates with `q=0` are treated as explicitly unacceptable and skipped.
+- Candidates whose normalized form is not in the supported list are skipped,
+  and the server continues to the next candidate.
+- If no acceptable candidate is present, the server falls back to `en`.
+
+There is **no** `X-Locale` header, **no** `?locale=` query parameter, and
+**no** per-user stored locale (`users.locale` is not read or written). Do not
+send any of these; if sent, they are ignored.
+
+### 12.3 What is localized
+
+Localized (HTTP response body only):
+
+- Top-level `message` fields produced by project controllers in the Identity,
+  Automation, Connections, Execution, and Integrations modules where the
+  string was moved to a translation namespace.
+- All `label` and `description` strings inside the `GET /api/catalog`
+  response, for every integration, action, trigger, and config field.
+
+NOT localized (remains English, by design):
+
+- `execution_steps.error_message` and `executions.error_message` — internal
+  diagnostics; remain English in the database and in every API response.
+- Raw provider / business-result `message` strings returned inside action
+  result payloads (for example, Google Sheets row-append result, Google Docs
+  append-text result, Google Sheets add/delete/update/clear result). These
+  are part of the business-result body, not the controller envelope, and
+  remain English.
+- Every `$e->getMessage()` diagnostic payload, Google exception message,
+  `trace`, `file`, and `line` field.
+- The 401 body `{ "message": "Unauthenticated." }` emitted by Laravel's
+  authentication middleware. Treat HTTP 401 as a state code; do not depend
+  on the message text.
+- The top-level `message` on a 422 response (`"The given data was invalid."`),
+  which is emitted by Laravel's exception handler. Read per-field messages
+  from `errors`, not from `message`.
+- Machine-readable identifiers, always: `integration_key`, `action_key`,
+  `trigger_key`, `provider_key`, field `key`, field `type`, `capability`,
+  `strategy`, `operation_id`, connection `status`, workflow `status`,
+  execution `status`, step `status`, capability error codes on `error`,
+  the `error` query parameter on the OAuth callback.
+- User-supplied data (workflow names, email subjects, etc.).
+
+### 12.4 Catalog
+
+The catalog's human-readable strings (`name`, `description`, action `label`
+and `description`, trigger `label` and `description`, field `label` and
+`description`) are resolved server-side using the request locale. The client
+receives translated text, not translation keys. The catalog **JSON shape**,
+identifier values, `capability` values, `strategy` values, field types,
+`required` flags, `default` values, `options`, and `options_source` are
+byte-identical across locales. Only the human-readable string values change.
+
+### 12.5 Validation errors
+
+The per-field messages inside a 422 response's `errors` object are localized
+when the corresponding `lang/{locale}/validation.php` file exists. At the
+time of this contract version, only the framework's built-in `en`
+translations are guaranteed to resolve; project-supplied overrides for
+individual locales may be absent. Mobile must treat HTTP 422 as a
+validation-state code and read the per-field messages from `errors`.
+Do not depend on the top-level `message` text.
+
+Example envelope under `Accept-Language: ar` with project Arabic validation
+files installed:
+
+```json
+{
+    "message": "The given data was invalid.",
+    "errors": { "email": ["حقل البريد الإلكتروني مطلوب."] }
+}
+```
+
+### 12.6 What does not change across locales
+
+The following are identical regardless of `Accept-Language`:
+
+- All endpoint paths.
+- All HTTP status codes.
+- All response envelope shapes (`{ message }`, `{ message, data }`,
+  `{ message, errors }`, `{ error }`, `{ error, context }`).
+- All identifier values listed in §12.3.
+- All capability error codes and their `context` payload keys.
+- All OAuth query-parameter names and error codes.
+- All `Accept-Language`-insensitive data payloads (`data.*`).
+
+### 12.7 Recommended mobile behavior
+
+- Rely on the platform HTTP client's default `Accept-Language` header.
+  No additional client work is required to receive a localized response.
+- Detect error classes by HTTP status code and by structured fields
+  (`errors.<field>`, `error`, `context.error`) — not by the top-level
+  `message` string.
+- Do not send `X-Locale`, `?locale=`, or any stored locale preference.
+
+---
+
+## 13. Final answers
 
 **Q: Are Connections, Workflows, Triggers, Steps, and Executions isolated per authenticated user, or is there any cross-user mixing?**
 
@@ -1911,5 +2025,4 @@ A: Yes. Steps can reference an earlier step's output via `{{ steps.N.output.<key
 
 **Q: Can the Mobile Developer start integrating tomorrow?**
 
-A: Yes. Use `/api/login` for users who have email/password credentials, or the Google OAuth flow for users who sign in with Google. Every endpoint needed to build the automation UI is present, authenticated, and owner-scoped. The Catalog uses the same canonical identifiers as the Workflow API, so no client-side mapping layer is required. See §5.7 for the one config-handling pitfall (`label_id`) that must be handled correctly on the mobile side. See §3.5 for the Gmail reconnect requirement when the user wants to use the newer Gmail actions. See §5.9 for the verified output keys per Gmail action, and §5.17 and §5.18 for how to build multi-step workflows with `{{ steps.N.output.* }}` references.
-
+A: Yes. Use `/api/login` for users who have email/password credentials, or the Google OAuth flow for users who sign in with Google. Every endpoint needed to build the automation UI is present, authenticated, and owner-scoped. The Catalog uses the same canonical identifiers as the Workflow API, so no client-side mapping layer is required. See §5.7 for the one config-handling pitfall (`label_id`) that must be handled correctly on the mobile side. See §3.5 for the Gmail reconnect requirement when the user wants to use the newer Gmail actions. See §5.9 for the verified output keys per Gmail action, and §5.17 and §5.18 for how to build multi-step workflows with `{{ steps.N.output.* }}` references. See §12 for localization.

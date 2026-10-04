@@ -34,8 +34,8 @@ final class CatalogProjector
         return [
             'integration_key' => $integration->key->value,
             'provider_key' => $integration->providerKey->value,
-            'name' => $integration->name,
-            'description' => $integration->description,
+            'name' => $this->resolve($integration->nameKey, $integration->name),
+            'description' => $this->resolve($integration->descriptionKey, $integration->description),
             'category' => $integration->category,
             'auth' => [
                 'type' => $integration->auth->type,
@@ -58,8 +58,8 @@ final class CatalogProjector
     {
         return [
             'trigger_key' => $trigger->key,
-            'label' => $trigger->label,
-            'description' => $trigger->description,
+            'label' => $this->resolve($trigger->labelKey, $trigger->label),
+            'description' => $this->resolve($trigger->descriptionKey, $trigger->description),
             'strategy' => $trigger->strategy->value,
             'capability' => $trigger->capability,
             'config' => $this->projectConfig($trigger->fields),
@@ -73,8 +73,8 @@ final class CatalogProjector
     {
         return [
             'action_key' => $action->key,
-            'label' => $action->label,
-            'description' => $action->description,
+            'label' => $this->resolve($action->labelKey, $action->label),
+            'description' => $this->resolve($action->descriptionKey, $action->description),
             'capability' => $action->capability,
             'config' => $this->projectConfig($action->fields),
         ];
@@ -103,12 +103,14 @@ final class CatalogProjector
     private function projectField(FieldDefinition $field): array
     {
         $projected = [
-            'label' => $field->label,
+            'label' => $this->resolve($field->labelKey, $field->label),
             'type' => $field->type,
             'required' => $field->required,
         ];
 
-        if ($field->description !== null) {
+        if ($field->descriptionKey !== null) {
+            $projected['description'] = $this->resolve($field->descriptionKey, $field->description ?? '');
+        } elseif ($field->description !== null) {
             $projected['description'] = $field->description;
         }
 
@@ -125,5 +127,24 @@ final class CatalogProjector
         }
 
         return $projected;
+    }
+
+    /**
+     * Resolve a translation key. When the key is null, empty, or returns itself
+     * (Laravel's signal that the key is missing), fall back to the raw English.
+     */
+    private function resolve(?string $key, string $fallback): string
+    {
+        if ($key === null || $key === '') {
+            return $fallback;
+        }
+
+        $translated = __($key);
+
+        if (! is_string($translated) || $translated === $key) {
+            return $fallback;
+        }
+
+        return $translated;
     }
 }

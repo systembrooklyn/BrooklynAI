@@ -14,6 +14,8 @@ class IdentityServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadTranslationsFrom(__DIR__.'/../../Lang', 'identity');
+
         Route::middleware('api')
             ->group(__DIR__.'/../../Http/Routes/api.php');
     }
