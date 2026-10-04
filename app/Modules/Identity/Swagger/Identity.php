@@ -79,6 +79,74 @@ class Identity
     )]
     public function login(): void {}
 
+    #[OA\Post(
+        path: '/api/password/forgot',
+        operationId: 'auth.password.forgot',
+        tags: ['Authentication'],
+        summary: 'Request a password reset code',
+        description: 'Sends a 6-digit OTP to the given email address if it belongs to an existing user. The response is identical for known and unknown emails to prevent email enumeration. The code expires in 15 minutes. Rate limited to 5 requests per email per hour and 20 requests per IP per hour.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email'],
+                properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email', maxLength: 255),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Reset code dispatched (or email does not exist — same response)', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: "If that email exists, we've sent a reset code."),
+                ],
+            )),
+            new OA\Response(response: 422, ref: '#/components/responses/ValidationErrorResponse'),
+            new OA\Response(response: 429, description: 'Too many requests', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Too many requests. Please try again later.'),
+                ],
+            )),
+        ],
+    )]
+    public function forgotPassword(): void {}
+
+    #[OA\Post(
+        path: '/api/password/reset',
+        operationId: 'auth.password.reset',
+        tags: ['Authentication'],
+        summary: 'Reset password with OTP code',
+        description: 'Verifies the 6-digit OTP and sets the new password. On success, all existing Sanctum tokens for the user are revoked. Returns a single generic 422 for every failure mode (missing code, expired code, used code, wrong code, or attempts exhausted). Rate limited to 20 requests per email per hour and 60 requests per IP per hour.',
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['email', 'code', 'password'],
+                properties: [
+                    new OA\Property(property: 'email', type: 'string', format: 'email', maxLength: 255),
+                    new OA\Property(property: 'code', type: 'string', minLength: 4, maxLength: 10, example: '482913'),
+                    new OA\Property(property: 'password', type: 'string', minLength: 6, maxLength: 255),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Password reset successfully', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Password reset successful. Please log in with your new password.'),
+                ],
+            )),
+            new OA\Response(response: 422, description: 'Invalid, expired, or exhausted reset code', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'The reset code is invalid or has expired.'),
+                ],
+            )),
+            new OA\Response(response: 429, description: 'Too many requests', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Too many requests. Please try again later.'),
+                ],
+            )),
+        ],
+    )]
+    public function resetPassword(): void {}
+
     #[OA\Get(
         path: '/api/user',
         operationId: 'auth.user',

@@ -896,18 +896,18 @@ provider response. The keys below are the ones the backend actually returns
 today. They are the only keys that may be referenced from a later step via
 `{{ steps.N.output.<key> }}`.
 
-| Action | Output keys | Example |
-| --- | --- | --- |
-| `send_email` | `sent` (boolean), `message_id` (string) | `{ "sent": true, "message_id": "1a101cf1b7ca9c08" }` |
-| `reply_to_email` | `sent` (boolean), `message_id` (string) | `{ "sent": true, "message_id": "1a1021a26fe357a3" }` |
-| `create_draft` | `created` (boolean), `draft_id` (string), `message_id` (string) | `{ "created": true, "draft_id": "r-7036261660220453950", "message_id": "1a101d92dd8bdabb" }` |
-| `mark_as_read` | `modified` (boolean), `message_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54" }` |
-| `mark_as_unread` | `modified` (boolean), `message_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54" }` |
-| `archive` | `modified` (boolean), `message_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54" }` |
-| `trash` | `modified` (boolean), `message_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54" }` |
-| `add_label` | `modified` (boolean), `message_id` (string), `label_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54", "label_id": "Label_1" }` |
-| `remove_label` | `modified` (boolean), `message_id` (string), `label_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54", "label_id": "Label_1" }` |
-| `create_label` | `created` (boolean), `label_id` (string), `name` (string) | `{ "created": true, "label_id": "Label_1", "name": "E2E-MultiLabel" }` |
+| Action           | Output keys                                                      | Example                                                                                      |
+| ---------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `send_email`     | `sent` (boolean), `message_id` (string)                          | `{ "sent": true, "message_id": "1a101cf1b7ca9c08" }`                                         |
+| `reply_to_email` | `sent` (boolean), `message_id` (string)                          | `{ "sent": true, "message_id": "1a1021a26fe357a3" }`                                         |
+| `create_draft`   | `created` (boolean), `draft_id` (string), `message_id` (string)  | `{ "created": true, "draft_id": "r-7036261660220453950", "message_id": "1a101d92dd8bdabb" }` |
+| `mark_as_read`   | `modified` (boolean), `message_id` (string)                      | `{ "modified": true, "message_id": "1a101e9eaca9df54" }`                                     |
+| `mark_as_unread` | `modified` (boolean), `message_id` (string)                      | `{ "modified": true, "message_id": "1a101e9eaca9df54" }`                                     |
+| `archive`        | `modified` (boolean), `message_id` (string)                      | `{ "modified": true, "message_id": "1a101e9eaca9df54" }`                                     |
+| `trash`          | `modified` (boolean), `message_id` (string)                      | `{ "modified": true, "message_id": "1a101e9eaca9df54" }`                                     |
+| `add_label`      | `modified` (boolean), `message_id` (string), `label_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54", "label_id": "Label_1" }`              |
+| `remove_label`   | `modified` (boolean), `message_id` (string), `label_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54", "label_id": "Label_1" }`              |
+| `create_label`   | `created` (boolean), `label_id` (string), `name` (string)        | `{ "created": true, "label_id": "Label_1", "name": "E2E-MultiLabel" }`                       |
 
 **These output keys are the ONLY stable contract for inter-step references.**
 Do not assume additional keys exist. Any key not listed above is not returned
@@ -1140,15 +1140,15 @@ state twice, remove the label, then archive and trash the message. Steps 2 and
 
 **Step order (position → action):**
 
-| Position | Action | Notes |
-| --- | --- | --- |
-| 1 | `create_label` | Creates the label and returns its `label_id`. |
-| 2 | `add_label` | Uses `{{ steps.1.output.label_id }}`. |
-| 3 | `mark_as_unread` | Uses `{{ trigger.message_id }}`. |
-| 4 | `mark_as_read` | Uses `{{ trigger.message_id }}`. |
-| 5 | `remove_label` | Uses `{{ steps.1.output.label_id }}`. |
-| 6 | `archive` | Uses `{{ trigger.message_id }}`. |
-| 7 | `trash` | Uses `{{ trigger.message_id }}`. |
+| Position | Action           | Notes                                         |
+| -------- | ---------------- | --------------------------------------------- |
+| 1        | `create_label`   | Creates the label and returns its `label_id`. |
+| 2        | `add_label`      | Uses `{{ steps.1.output.label_id }}`.         |
+| 3        | `mark_as_unread` | Uses `{{ trigger.message_id }}`.              |
+| 4        | `mark_as_read`   | Uses `{{ trigger.message_id }}`.              |
+| 5        | `remove_label`   | Uses `{{ steps.1.output.label_id }}`.         |
+| 6        | `archive`        | Uses `{{ trigger.message_id }}`.              |
+| 7        | `trash`          | Uses `{{ trigger.message_id }}`.              |
 
 **Step 1 — create the label**
 
@@ -1170,9 +1170,9 @@ Runtime output:
 
 ```json
 {
-  "created": true,
-  "label_id": "Label_1",
-  "name": "E2E-MultiLabel"
+    "created": true,
+    "label_id": "Label_1",
+    "name": "E2E-MultiLabel"
 }
 ```
 
@@ -1200,9 +1200,9 @@ At runtime, `{{ steps.1.output.label_id }}` resolves to the string
 
 ```json
 {
-  "modified": true,
-  "message_id": "1a101e9eaca9df54",
-  "label_id": "Label_1"
+    "modified": true,
+    "message_id": "1a101e9eaca9df54",
+    "label_id": "Label_1"
 }
 ```
 
@@ -1283,85 +1283,85 @@ the execution — it is the same `label_id` that step 1 returned.
 
 ```json
 {
-  "id": 5,
-  "name": "E2E Multi-Action Workflow",
-  "status": "draft",
-  "trigger": {
-    "id": 6,
-    "integration_key": "google.gmail",
-    "trigger_key": "new_email_received",
-    "connection_id": 1,
-    "strategy": "poll",
-    "config": {
-      "subject": "E2E-Multi",
-      "label_id": "INBOX"
+    "id": 5,
+    "name": "E2E Multi-Action Workflow",
+    "status": "draft",
+    "trigger": {
+        "id": 6,
+        "integration_key": "google.gmail",
+        "trigger_key": "new_email_received",
+        "connection_id": 1,
+        "strategy": "poll",
+        "config": {
+            "subject": "E2E-Multi",
+            "label_id": "INBOX"
+        },
+        "interval_minutes": null
     },
-    "interval_minutes": null
-  },
-  "steps": [
-    {
-      "id": 7,
-      "position": 1,
-      "integration_key": "google.gmail",
-      "action_key": "create_label",
-      "connection_id": 1,
-      "config": { "name": "E2E-MultiLabel" }
-    },
-    {
-      "id": 8,
-      "position": 2,
-      "integration_key": "google.gmail",
-      "action_key": "add_label",
-      "connection_id": 1,
-      "config": {
-        "label_id": "{{ steps.1.output.label_id }}",
-        "message_id": "{{ trigger.message_id }}"
-      }
-    },
-    {
-      "id": 9,
-      "position": 3,
-      "integration_key": "google.gmail",
-      "action_key": "mark_as_unread",
-      "connection_id": 1,
-      "config": { "message_id": "{{ trigger.message_id }}" }
-    },
-    {
-      "id": 10,
-      "position": 4,
-      "integration_key": "google.gmail",
-      "action_key": "mark_as_read",
-      "connection_id": 1,
-      "config": { "message_id": "{{ trigger.message_id }}" }
-    },
-    {
-      "id": 11,
-      "position": 5,
-      "integration_key": "google.gmail",
-      "action_key": "remove_label",
-      "connection_id": 1,
-      "config": {
-        "label_id": "{{ steps.1.output.label_id }}",
-        "message_id": "{{ trigger.message_id }}"
-      }
-    },
-    {
-      "id": 12,
-      "position": 6,
-      "integration_key": "google.gmail",
-      "action_key": "archive",
-      "connection_id": 1,
-      "config": { "message_id": "{{ trigger.message_id }}" }
-    },
-    {
-      "id": 13,
-      "position": 7,
-      "integration_key": "google.gmail",
-      "action_key": "trash",
-      "connection_id": 1,
-      "config": { "message_id": "{{ trigger.message_id }}" }
-    }
-  ]
+    "steps": [
+        {
+            "id": 7,
+            "position": 1,
+            "integration_key": "google.gmail",
+            "action_key": "create_label",
+            "connection_id": 1,
+            "config": { "name": "E2E-MultiLabel" }
+        },
+        {
+            "id": 8,
+            "position": 2,
+            "integration_key": "google.gmail",
+            "action_key": "add_label",
+            "connection_id": 1,
+            "config": {
+                "label_id": "{{ steps.1.output.label_id }}",
+                "message_id": "{{ trigger.message_id }}"
+            }
+        },
+        {
+            "id": 9,
+            "position": 3,
+            "integration_key": "google.gmail",
+            "action_key": "mark_as_unread",
+            "connection_id": 1,
+            "config": { "message_id": "{{ trigger.message_id }}" }
+        },
+        {
+            "id": 10,
+            "position": 4,
+            "integration_key": "google.gmail",
+            "action_key": "mark_as_read",
+            "connection_id": 1,
+            "config": { "message_id": "{{ trigger.message_id }}" }
+        },
+        {
+            "id": 11,
+            "position": 5,
+            "integration_key": "google.gmail",
+            "action_key": "remove_label",
+            "connection_id": 1,
+            "config": {
+                "label_id": "{{ steps.1.output.label_id }}",
+                "message_id": "{{ trigger.message_id }}"
+            }
+        },
+        {
+            "id": 12,
+            "position": 6,
+            "integration_key": "google.gmail",
+            "action_key": "archive",
+            "connection_id": 1,
+            "config": { "message_id": "{{ trigger.message_id }}" }
+        },
+        {
+            "id": 13,
+            "position": 7,
+            "integration_key": "google.gmail",
+            "action_key": "trash",
+            "connection_id": 1,
+            "config": { "message_id": "{{ trigger.message_id }}" }
+        }
+    ]
 }
 ```
 
@@ -1369,76 +1369,76 @@ the execution — it is the same `label_id` that step 1 returned.
 
 ```json
 {
-  "status": "completed",
-  "trigger_source": "poll",
-  "steps": [
-    {
-      "position": 1,
-      "action_key": "create_label",
-      "status": "completed",
-      "output": {
-        "created": true,
-        "label_id": "Label_1",
-        "name": "E2E-MultiLabel"
-      }
-    },
-    {
-      "position": 2,
-      "action_key": "add_label",
-      "status": "completed",
-      "output": {
-        "modified": true,
-        "message_id": "1a101e9eaca9df54",
-        "label_id": "Label_1"
-      }
-    },
-    {
-      "position": 3,
-      "action_key": "mark_as_unread",
-      "status": "completed",
-      "output": {
-        "modified": true,
-        "message_id": "1a101e9eaca9df54"
-      }
-    },
-    {
-      "position": 4,
-      "action_key": "mark_as_read",
-      "status": "completed",
-      "output": {
-        "modified": true,
-        "message_id": "1a101e9eaca9df54"
-      }
-    },
-    {
-      "position": 5,
-      "action_key": "remove_label",
-      "status": "completed",
-      "output": {
-        "modified": true,
-        "message_id": "1a101e9eaca9df54",
-        "label_id": "Label_1"
-      }
-    },
-    {
-      "position": 6,
-      "action_key": "archive",
-      "status": "completed",
-      "output": {
-        "modified": true,
-        "message_id": "1a101e9eaca9df54"
-      }
-    },
-    {
-      "position": 7,
-      "action_key": "trash",
-      "status": "completed",
-      "output": {
-        "modified": true,
-        "message_id": "1a101e9eaca9df54"
-      }
-    }
-  ]
+    "status": "completed",
+    "trigger_source": "poll",
+    "steps": [
+        {
+            "position": 1,
+            "action_key": "create_label",
+            "status": "completed",
+            "output": {
+                "created": true,
+                "label_id": "Label_1",
+                "name": "E2E-MultiLabel"
+            }
+        },
+        {
+            "position": 2,
+            "action_key": "add_label",
+            "status": "completed",
+            "output": {
+                "modified": true,
+                "message_id": "1a101e9eaca9df54",
+                "label_id": "Label_1"
+            }
+        },
+        {
+            "position": 3,
+            "action_key": "mark_as_unread",
+            "status": "completed",
+            "output": {
+                "modified": true,
+                "message_id": "1a101e9eaca9df54"
+            }
+        },
+        {
+            "position": 4,
+            "action_key": "mark_as_read",
+            "status": "completed",
+            "output": {
+                "modified": true,
+                "message_id": "1a101e9eaca9df54"
+            }
+        },
+        {
+            "position": 5,
+            "action_key": "remove_label",
+            "status": "completed",
+            "output": {
+                "modified": true,
+                "message_id": "1a101e9eaca9df54",
+                "label_id": "Label_1"
+            }
+        },
+        {
+            "position": 6,
+            "action_key": "archive",
+            "status": "completed",
+            "output": {
+                "modified": true,
+                "message_id": "1a101e9eaca9df54"
+            }
+        },
+        {
+            "position": 7,
+            "action_key": "trash",
+            "status": "completed",
+            "output": {
+                "modified": true,
+                "message_id": "1a101e9eaca9df54"
+            }
+        }
+    ]
 }
 ```
 
@@ -1999,7 +1999,140 @@ The following are identical regardless of `Accept-Language`:
 
 ---
 
-## 13. Final answers
+## 13. Password Reset (Forgot Password)
+
+### 13.1 Overview
+
+Two public endpoints support password reset via email OTP:
+
+```
+POST /api/password/forgot    — request a reset code
+POST /api/password/reset     — verify the code and set a new password
+```
+
+Both endpoints are public (no authentication required). Both return generic
+responses to prevent email enumeration.
+
+### 13.2 Request reset
+
+```
+POST /api/password/forgot
+Body: { "email": "user@example.com" }
+```
+
+Response (HTTP 200):
+
+```json
+{ "message": "If that email exists, we've sent a reset code." }
+```
+
+Behavior:
+
+- If the email matches an existing, non-soft-deleted user, the server
+  generates a 6-digit code and emails it to that address. The code expires
+  in 15 minutes.
+- If the email does not match any user, the response is identical, but no
+  email is sent.
+- The same response is returned in both cases. Mobile must not attempt to
+  distinguish.
+
+Rate limits:
+
+- 5 requests per email address per hour.
+- 20 requests per IP address per hour.
+
+Exceeded limits → HTTP 429 `{ "message": "Too many requests. Please try again later." }`
+with a `Retry-After` header.
+
+### 13.3 Reset password
+
+```
+POST /api/password/reset
+Body: {
+  "email": "user@example.com",
+  "code": "123456",
+  "password": "new-password"
+}
+```
+
+- `email` — required, valid email.
+- `code` — required, string, 4–10 characters (default 6).
+- `password` — required, string, minimum 6 characters.
+
+Success (HTTP 200):
+
+```json
+{
+    "message": "Password reset successful. Please log in with your new password."
+}
+```
+
+Failure (HTTP 422):
+
+```json
+{ "message": "The reset code is invalid or has expired." }
+```
+
+Returned for every failure mode:
+
+- No OTP issued for this email.
+- OTP already used.
+- OTP expired (15-minute TTL).
+- Attempts exhausted (5 wrong codes).
+- Code mismatch.
+
+Mobile must show a single generic message to the user.
+
+Rate limits:
+
+- 20 requests per email address per hour.
+- 60 requests per IP address per hour.
+
+Exceeded limits → HTTP 429 with `Retry-After`.
+
+Behavior on success:
+
+- The user's password is updated.
+- All active Sanctum tokens for that user are revoked. The user must log in
+  again with the new password.
+
+### 13.4 Security notes
+
+- The reset code is a 6-digit numeric OTP, uniformly random, no leading zero.
+- Only a bcrypt hash of the code is stored. The plain code is never persisted.
+- The code is single-use. Once consumed successfully, it cannot be reused.
+- Issuing a new code invalidates any previously issued code for the same email.
+- Wrong-code attempts increment an attempts counter on the code. After 5
+  failed attempts, the code is rejected even if the correct code is later
+  supplied. A new code must be requested.
+- On password reset, all existing sessions (Sanctum tokens) for the user are
+  revoked. This is a safety measure against compromised sessions.
+- Email enumeration is mitigated by returning an identical response to both
+  known and unknown email addresses.
+
+### 13.5 What the OTP email contains
+
+The reset email is a standard Laravel mail notification. It contains:
+
+- A greeting with the user's name.
+- The 6-digit code.
+- A note that the code expires in 15 minutes.
+- A note that the user can ignore the email if they did not request it.
+
+The email is sent in the request locale, resolved from the `Accept-Language`
+header (see §12). The email body text is localized via `identity::messages.*`.
+
+### 13.6 Production requirements
+
+- `MAIL_MAILER` must be configured to a real mailer (SMTP, SES, Postmark, etc.).
+  The default `log` driver writes emails to `storage/logs/laravel.log` and
+  delivers nothing.
+- `MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME` must be configured.
+- The `password_reset_otps` table must be migrated.
+
+---
+
+## 14. Final answers
 
 **Q: Are Connections, Workflows, Triggers, Steps, and Executions isolated per authenticated user, or is there any cross-user mixing?**
 
