@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'too_many_attempts' => 'Too many attempts. Please try again later.',
     'login_success' => 'Login successful.',
     'invalid_credentials' => 'Invalid credentials.',
 
@@ -15,7 +16,7 @@ return [
     'password_reset_email_greeting' => 'Hello :name,',
     'password_reset_email_line_1' => 'You requested a password reset. Use the code below to set a new password:',
     'password_reset_email_code' => 'Reset code: :code',
-   'password_reset_email_expiry' => 'This code expires in :minutes minutes.',
+    'password_reset_email_expiry' => 'This code expires in :minutes minutes.',
     'password_reset_email_line_2' => "If you didn't request this, you can safely ignore this email.",
 
     'password_reset_email_code_label' => 'Your reset code',
