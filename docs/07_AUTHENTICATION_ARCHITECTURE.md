@@ -1,50 +1,64 @@
 # 07 — Authentication Architecture
 
-Status: DESIGN ONLY. No implementation authorized.
+Status: PARTIALLY IMPLEMENTED. Sections marked `[IMPLEMENTED]` describe live behavior. Sections marked `[DESIGN]` are design-only and have not been authorized for implementation.
 
-Scope: additive design for supporting Google OAuth (existing, production) and Email/Password (new) against the same application-level `User` and the same Sanctum bearer-token model.
+Scope: authentication surface of the platform — Google OAuth (existing, production), Email/Password login (existing), and Password Reset via email OTP (implemented). Written against the same `User` model and the same Sanctum bearer-token model.
 
-Version: 1.0.0
-Last updated: pre-implementation design.
+Version: 1.1.0
+Last updated: post-password-reset implementation.
 
 Phase 9 (Security Hardening) remains LOCKED.
 Phase 10 (Legacy Cleanup) remains LOCKED.
 
+References:
+
+- `docs/03_ARCHITECTURE_DECISIONS.md` — ADR-029 (Localization), ADR-030 (Password Reset)
+- `docs/06_MOBILE_API_CONTRACT.md` — the mobile-facing contract
+
 ---
 
-## 1. Current architecture (baseline)
+## 1. Current architecture (baseline) `[IMPLEMENTED]`
 
-Authentication today is Google OAuth via Socialite, followed by Sanctum token issuance.
+Authentication today is Google OAuth via Socialite, email/password login, and
+Sanctum bearer-token issuance. Password reset is available via email OTP.
 
 ```
-Google OAuth (Socialite)
-        ↓
-User (resolved by email)
-        ↓
-Sanctum personal access token
-        ↓
-Mobile / Web API
-        ↓
-Connections / Workflows / Triggers / Steps / Executions
+Google OAuth (Socialite)        Email + Password              Password Reset
+        │                              │                            │
+        ▼                              ▼                            ▼
+   Resolve user by email        Hash::check()                OTP to email
+        │                              │                            │
+        └──────────────┬───────────────┴────────────────────────────┘
+                       ▼
+             Sanctum personal access token
+                       │
+                       ▼
+                Mobile / Web API
+                       │
+                       ▼
+    Connections / Workflows / Triggers / Steps / Executions
 ```
 
 Registered authentication-related routes (verified):
 
 - `POST /api/register` — creates or updates a user; does NOT issue a token.
+- `POST /api/login` — email/password login; issues a Sanctum token.
 - `GET  /api/auth/google/redirect` — begins Google login via Socialite.
 - `GET  /api/auth/google/redirect-google` — begins Google login with the legacy scope list.
 - `GET  /api/auth/google/callback` — completes Google login; redirects to the frontend with `?token=<sanctum-token>`.
 - `POST /api/logout` — revokes every Sanctum token owned by the authenticated user.
 - `POST /api/account/deactivate` — soft-deletes the user and revokes all tokens.
 - `POST /api/test/login` — dev-only; shared master password; issues a token for any existing email.
+- `POST /api/password/forgot` — **new**; requests a password reset OTP.
+- `POST /api/password/reset` — **new**; verifies the OTP and sets a new password.
 
 Ownership model: every user-owned resource is scoped by `user_id` at the repository layer. No cross-user access exists in the supplied code.
 
 ---
 
-## 2. Production compatibility contract
+## 2. Production compatibility contract `[IMPLEMENTED]`
 
-This is the hard constraint. Everything in Phase A (design) must respect it.
+This is the hard constraint. Everything must respect it.
 
 ### MUST NOT CHANGE
 
@@ -59,7 +73,7 @@ This is the hard constraint. Everything in Phase A (design) must respect it.
 
 ### CAN BE EXTENDED
 
-- Additive routes (e.g. `POST /api/auth/login`, `POST /api/auth/forgot-password`).
+- Additive routes (already done: `/api/login`, `/api/password/forgot`, `/api/password/reset`).
 - Additive `User` columns (nullable, with safe defaults).
 - Additive token abilities for future endpoints.
 - Additive middleware for rate limiting on new endpoints.
@@ -82,7 +96,7 @@ This is the hard constraint. Everything in Phase A (design) must respect it.
 
 ---
 
-## 3. Identity model decision
+## 3. Identity model decision `[IMPLEMENTED — Option A]`
 
 Two candidate models were considered.
 
@@ -127,7 +141,7 @@ Disadvantages:
 - Higher blast radius: current callback, current Connection modules, current tests. Every existing path that resolves the user by email must be revisited.
 - Introduces a second identity source of truth at a moment when the production system is live.
 
-### Recommendation for THIS project
+### Decision
 
 **Option A.** Reasons, ranked by the priorities stated in the design brief:
 
@@ -141,7 +155,7 @@ Option A does not preclude Option B later. It defers the abstraction until there
 
 ---
 
-## 4. Google preservation strategy
+## 4. Google preservation strategy `[IMPLEMENTED as-is]`
 
 Google login is production. Improvements are separated by risk class.
 
@@ -164,7 +178,7 @@ Google login is production. Improvements are separated by risk class.
 - No rate limiting on the OAuth initiation or callback.
 - Lookup is by email only; `google_id` is stored but not used as primary identifier.
 
-### C) Safe future improvements
+### C) Safe future improvements `[DESIGN]`
 
 - Add `throttle:` middleware to the callback and redirect endpoints.
 - Encrypt `users.google_access_token` / `users.google_refresh_token` via a model cast. This is additive: a migration reads the plaintext values and writes encrypted ones in place. Existing tokens keep working after the cast is enabled, provided the migration is run under the same `APP_KEY`.
@@ -177,11 +191,11 @@ Google login is production. Improvements are separated by risk class.
 - Changing the redirect target `https://www.aibrooklyn.net` would break live consumers. Deferred — requires coordination.
 - Switching identity resolution from `email` to `sub` without a fallback would break existing users whose `google_id` is null. Deferred — requires a backfill and a mixed-mode lookup.
 
-Nothing in this section is approved for implementation.
+Nothing in §4 C/D is approved for implementation.
 
 ---
 
-## 5. Google account + password account linking protocol
+## 5. Google account + password account linking protocol `[DESIGN]`
 
 Five scenarios are analyzed. All decisions below are recommendations for review; none are final.
 
@@ -249,18 +263,19 @@ Recommended behavior:
 
 ---
 
-## 6. Email/Password authentication design
+## 6. Email/Password authentication design `[PARTIALLY IMPLEMENTED]`
 
-### 6.1 Registration
+### 6.1 Registration `[IMPLEMENTED — unchanged]`
 
-Two options exist today: the live `POST /api/register` route and any future additive endpoint.
+The live `POST /api/register` route remains the provisioning path.
 
 Current endpoint:
 
 - `POST /api/register` — creates or updates a user. Does NOT issue a token. Validation: `name`, `email`, `password` (min 6), `st_num` (nullable), `access_expiry`.
 - Behavior when email exists: updates `access_expiry` and `has_bot_access`. Does not touch the password.
+- Response strings localized via `identity::messages.*` (per ADR-029).
 
-Design decision required:
+Design decision that remains open `[DESIGN]`:
 
 - Option 1 — Redefine `/api/register` to also issue a token. This changes the current production contract for any client relying on it. Not recommended.
 - Option 2 — Keep `/api/register` as-is, and add a new endpoint (working name `POST /api/auth/register`), which:
@@ -270,21 +285,24 @@ Design decision required:
   - Returns the token and user in a JSON body.
   - Requires email verification before the account can authenticate beyond a limited scope.
   - Does not affect existing accounts.
-- **Recommended:** Option 2. Additive.
+- **Recommended:** Option 2. Additive. **Not implemented.**
 
-### 6.2 Login
+### 6.2 Login `[IMPLEMENTED]`
 
-New endpoint (working name `POST /api/auth/login`):
+Live endpoint: `POST /api/login`.
 
 - Input: `email`, `password`.
 - Validates credentials via `Hash::check`.
-- Verifies account status: not soft-deleted, and (if email verification is required) `email_verified_at` set.
+- Verifies account status: not soft-deleted.
 - Issues a Sanctum token with the standard mechanism.
-- Returns a JSON body: `{ "token": "...", "user": { ... } }`.
-- Rate-limited (see §14).
-- On failure, returns a generic error without revealing whether the email exists.
+- Returns a JSON body: `{ "message": "Login successful.", "data": { "token": "...", "user": { ... } } }`.
+- On failure, returns a generic `401 { "message": "Invalid credentials." }` without revealing whether the email exists.
+- Response strings localized via `identity::messages.*` (per ADR-029).
+- `has_bot_access` / `access_expiry` are NOT checked at login — they are product entitlements, not authentication gates (see §11).
 
-### 6.3 Password change
+**Rate limiting `[DESIGN]`:** a corrected `LoginController` with a per-email+IP rate limit of 5 attempts per minute was proposed. Not applied. Awaits Phase 9 authorization.
+
+### 6.3 Password change `[DESIGN]`
 
 Authenticated endpoint (working name `POST /api/auth/password/change`):
 
@@ -293,13 +311,15 @@ Authenticated endpoint (working name `POST /api/auth/password/change`):
 - Hashes and stores the new password.
 - Optionally revokes all other tokens (`tokens()->where('id', '!=', $currentTokenId)->delete()`).
 
+Not implemented.
+
 ### 6.4 Relationship to `/api/register`
 
-`/api/register` remains live and unchanged. The new auth endpoint does not replace it.
+`/api/register` remains live and unchanged. No `/api/auth/register` endpoint exists yet.
 
 ---
 
-## 7. Email verification
+## 7. Email verification `[DESIGN]`
 
 Current state: no email verification exists.
 
@@ -327,46 +347,161 @@ No implementation in this phase.
 
 ---
 
-## 8. Password recovery
+## 8. Password recovery `[IMPLEMENTED]`
 
-New endpoints (working names):
+Implemented as an OTP-based reset flow, live in production.
 
-- `POST /api/auth/password/forgot` — accepts `email`. Always returns success. Sends a reset link if the email exists. Rate-limited.
-- `POST /api/auth/password/reset` — accepts `token`, `email`, `password`, `password_confirmation`.
+### 8.1 Endpoints
 
-Reset token lifecycle:
+Two public endpoints (no authentication required):
 
-- Single-use.
-- Time-limited (Laravel default of 60 minutes is acceptable).
-- Invalidated on successful reset.
-- Stored in the standard Laravel `password_reset_tokens` table.
-- A successful reset revokes all existing tokens for the user (optional but recommended).
+```
+POST /api/password/forgot
+POST /api/password/reset
+```
 
-No implementation in this phase.
+### 8.2 `/api/password/forgot`
+
+- Request body: `{ "email": "user@example.com" }`.
+- Validation: `email` — required, string, valid email format, max 255.
+- If the email matches an existing, non-soft-deleted user, the server:
+  1. Generates a 6-digit numeric OTP (uniformly random, no leading zero).
+  2. Stores `Hash::make($code)` in the `password_reset_otps` table.
+  3. Sends an email containing the plain code.
+- If the email does NOT match any user: identical response, no email sent.
+- Response (HTTP 200): `{ "message": "If that email exists, we've sent a reset code." }`.
+- Email enumeration is prevented by the generic response.
+- Response body is localized via `identity::messages.*` (ADR-029).
+
+Rate limits (via `RateLimiter`):
+
+- 5 requests per email address per hour.
+- 20 requests per IP address per hour.
+
+Exceeded → HTTP 429 with `Retry-After: 3600`.
+
+### 8.3 `/api/password/reset`
+
+- Request body: `{ "email": "...", "code": "123456", "password": "new-password" }`.
+- Validation: `email` (valid), `code` (string, 4–10 chars), `password` (string, min 6, max 255).
+- On success:
+  1. The user's password is updated (via the model's `password` cast, which hashes).
+  2. All active Sanctum tokens for that user are revoked.
+  3. Response (HTTP 200): `{ "message": "Password reset successful. Please log in with your new password." }`.
+- On every failure mode, the response is identical: HTTP 422 `{ "message": "The reset code is invalid or has expired." }`.
+
+Failure modes:
+
+- No OTP row exists for the email.
+- OTP already used.
+- OTP expired (15-minute TTL).
+- Attempts exhausted (5 wrong attempts on the same code).
+- Code mismatch.
+- User was deleted between issuance and reset.
+
+Rate limits:
+
+- 20 requests per email address per hour.
+- 60 requests per IP address per hour.
+
+Exceeded → HTTP 429 with `Retry-After: 3600`.
+
+### 8.4 OTP lifecycle
+
+- Length: 6 digits.
+- Character set: numeric.
+- TTL: 15 minutes.
+- Attempt cap: 5 wrong attempts per issued code. On the 6th attempt, the code is rejected even if the correct code is later supplied. A new code must be requested.
+- Single-use: once consumed successfully, a code cannot be reused.
+- Re-issuance: issuing a new code for the same email replaces the prior row entirely. Only one active code per email exists at any time.
+- Storage: only a bcrypt hash of the code is persisted. The plain code is never persisted and never logged.
+
+### 8.5 Storage
+
+New table `password_reset_otps`, created by a module-owned migration:
+
+```
+app/Modules/Identity/Infrastructure/Database/Migrations/2026_10_04_000001_create_password_reset_otps_table.php
+```
+
+Columns:
+
+- `id`
+- `email` (unique)
+- `code_hash`
+- `attempts` (unsigned tiny int, default 0)
+- `expires_at`
+- `used_at` (nullable)
+- `created_at`, `updated_at`
+
+Index: `expires_at` (for future cleanup).
+
+The existing `password_reset_tokens` table remains unused and unmodified.
+
+### 8.6 Email delivery
+
+- Delivered via a Laravel notification (`PasswordResetOtpNotification`).
+- Body rendered from a project-owned Blade template:
+  `app/Modules/Identity/Views/emails/password-reset-otp.blade.php`.
+- No Laravel default mail template. No branding from the framework.
+- Body localized via `identity::messages.*` using the request locale (`Accept-Language`, ADR-029).
+- `MAIL_MAILER` must be configured to a real transport (SMTP, SES, Postmark, Resend) in production. The default `log` driver writes the OTP to `storage/logs/laravel.log` and delivers nothing. Documented in `docs/08_DEPLOYMENT.md`.
+
+### 8.7 Config
+
+`app/Modules/Identity/Infrastructure/Config/identity.php` (merged at runtime via `mergeConfigFrom`):
+
+```php
+'password_reset' => [
+    'code_length'                          => env('PASSWORD_RESET_CODE_LENGTH', 6),
+    'code_ttl_minutes'                     => env('PASSWORD_RESET_CODE_TTL_MINUTES', 15),
+    'max_attempts'                         => env('PASSWORD_RESET_MAX_ATTEMPTS', 5),
+    'forgot_rate_limit_per_email_per_hour' => env('PASSWORD_RESET_FORGOT_RATE_EMAIL', 5),
+    'forgot_rate_limit_per_ip_per_hour'    => env('PASSWORD_RESET_FORGOT_RATE_IP', 20),
+    'reset_rate_limit_per_email_per_hour'  => env('PASSWORD_RESET_RESET_RATE_EMAIL', 20),
+    'reset_rate_limit_per_ip_per_hour'     => env('PASSWORD_RESET_RESET_RATE_IP', 60),
+],
+```
+
+### 8.8 Explicit non-features
+
+The following were considered and are **NOT** implemented:
+
+- **Master OTP** — a static shared secret bypassing the per-email OTP was proposed and explicitly rejected. It would be a privileged backdoor with no per-person audit trail.
+- **CLI reset command** — `php artisan user:reset-password` was proposed as a safer alternative for support use; not implemented.
+- **Admin reset endpoint** — not implemented.
+- **Email link flow** — not implemented. Only OTP is supported.
+- **SMS / WhatsApp delivery** — not implemented.
+- **Password reset for soft-deleted users** — not implemented. Soft-deleted users cannot reset.
+- **Notification to the account owner when reset is completed** — not implemented. On a normal user-driven reset this is redundant; it becomes meaningful only for an operator-initiated reset, which itself is not implemented.
+
+### 8.9 Related ADR
+
+This section documents the implementation decision recorded in **ADR-030**.
 
 ---
 
-## 9. Sanctum token lifecycle
+## 9. Sanctum token lifecycle `[PARTIALLY IMPLEMENTED]`
 
-Current: personal access tokens, no abilities, no expiration (`'expiration' => null`), no per-device tracking.
+Current `[IMPLEMENTED]`: personal access tokens, no abilities, no expiration (`'expiration' => null`), no per-device tracking.
 
-Design decisions:
+Design decisions that remain open `[DESIGN]`:
 
-- Token creation: unchanged for Google login. The new email/password login uses the same `createToken` mechanism.
+- Token creation: unchanged for Google login and email/password login. Both use the same `createToken` mechanism.
 - Expiration: currently null. Any change to expiration must NOT apply retroactively to already-issued tokens. When expiry is introduced, it must apply only to newly issued tokens.
 - Revocation: logout revokes all tokens (unchanged). A future per-device logout endpoint would revoke a single token and is additive.
 - Account deactivation: revokes all tokens (unchanged).
 - Multiple devices: supported today implicitly. No change.
-- Per-device logout: additive endpoint (working name `POST /api/auth/logout/current`) that deletes only the current token. `POST /api/logout` continues to delete all.
-- Password change: revoke all other tokens. The active token may be retained or rotated. Recommended: retain the active token, revoke others.
-- Password reset: revoke all tokens. The user must re-authenticate.
+- Per-device logout: additive endpoint (working name `POST /api/auth/logout/current`) that deletes only the current token. `POST /api/logout` continues to delete all. Not implemented.
+- Password change: revoke all other tokens. The active token may be retained or rotated. Recommended: retain the active token, revoke others. Not implemented (there is no password change endpoint yet).
+- **Password reset `[IMPLEMENTED]`**: revokes ALL tokens for the user. The user must re-authenticate. This is live behavior, documented in `docs/06_MOBILE_API_CONTRACT.md` §13.3.
 - Compromised token handling: no endpoint today. A future "revoke all tokens" endpoint is additive and does not change any existing contract.
 
-Safety rule for the migration: **no change to token policy applies to tokens already issued.** Any expiration policy applies only to tokens created after the change. This is the only way to add expiration without logging out every live user.
+Safety rule for the migration: **no change to token policy applies to tokens already issued.** Any expiration policy applies only to tokens created after the change.
 
 ---
 
-## 10. Google identity vs Google connection
+## 10. Google identity vs Google connection `[IMPLEMENTED]`
 
 These are separate concepts and must remain separate.
 
@@ -380,11 +515,11 @@ Connections module OAuth → `Connection` row owned by a `user_id` → Actions (
 
 Owns: `connections` table and its encrypted credentials. Not `users.google_*`.
 
-Email/password authentication does not touch Connections. Ownership semantics are unchanged: a user who owns a Connection while logged in via Google still owns it when logged in via email/password, because the `user_id` is the same.
+Email/password authentication does not touch Connections. Password reset does not touch Connections. Ownership semantics are unchanged: a user who owns a Connection while logged in via Google still owns it when logged in via email/password, because the `user_id` is the same.
 
 ---
 
-## 11. `has_bot_access` and `access_expiry`
+## 11. `has_bot_access` and `access_expiry` `[IMPLEMENTED as-is]`
 
 These are product-level access entitlements, not authentication credentials.
 
@@ -395,23 +530,24 @@ Current uses:
 
 - Set during `/api/register` from `today() < access_expiry`.
 - Checked in the Google login callback: users with `has_bot_access == false` receive `token=null`.
+- NOT checked at `/api/login`. This is intentional — auth ≠ product access.
 
-Recommended treatment:
+Recommended treatment `[DESIGN]`:
 
 - Authentication (Google or email/password) issues a token if the user exists and is not soft-deleted.
 - Product access is enforced at request time via middleware or policy checks that read `has_bot_access` and `access_expiry`.
-- The current Google callback behavior for `has_bot_access == false` is preserved for backward compatibility. It is not a model to extend to email/password login, which should authenticate normally and let authorization gate access.
+- The current Google callback behavior for `has_bot_access == false` is preserved for backward compatibility. It is not a model to extend to email/password login.
 - This keeps authentication ≠ product access.
 
-No implementation in this phase.
+No change in this phase.
 
 ---
 
-## 12. Development / test login
+## 12. Development / test login `[IMPLEMENTED as-is]`
 
 Current: `POST /api/test/login` uses a shared master password to issue a token for any existing email. Marked dev-only in comments. Not gated by environment.
 
-Design decision:
+Design decision `[DESIGN]`:
 
 - Keep the endpoint in development and test environments.
 - Gate it explicitly by environment (e.g. `APP_ENV !== 'production'`) via middleware or route registration.
@@ -422,39 +558,48 @@ No changes in this phase.
 
 ---
 
-## 13. Rate limiting / abuse protection
+## 13. Rate limiting / abuse protection `[PARTIALLY IMPLEMENTED]`
 
-Current: none on the routes inspected.
+Rate limiting status today:
 
-Design:
+| Endpoint | Rate limit | Status |
+| --- | --- | --- |
+| `POST /api/register` | — | Not implemented |
+| `POST /api/login` | — | **Not implemented** — corrected controller proposed; not applied |
+| `POST /api/password/forgot` | 5 per email/h, 20 per IP/h | **Implemented** (ADR-030) |
+| `POST /api/password/reset` | 20 per email/h, 60 per IP/h | **Implemented** (ADR-030) |
+| `GET /api/auth/google/redirect` | — | Not implemented |
+| `GET /api/auth/google/callback` | — | Not implemented |
+| `POST /api/test/login` | — | Not implemented |
+
+Design `[DESIGN]` — remaining to add in Phase 9:
 
 - `POST /api/register` — rate limit by IP.
-- `POST /api/auth/login` — rate limit by IP and by email.
-- `POST /api/auth/password/forgot` — rate limit by IP and by email.
-- `POST /api/auth/password/reset` — rate limit by IP.
+- `POST /api/login` — rate limit by IP and by email (proposed 5/min per email+IP).
 - `GET /api/auth/google/redirect` and `/api/auth/google/callback` — rate limit by IP.
 - `POST /api/test/login` — rate limit by IP; environment-gated.
 
-No implementation in this phase.
+---
+
+## 14. Account lifecycle `[IMPLEMENTED + DESIGN]`
+
+- **Active** — normal. `[IMPLEMENTED]`
+- **Unverified** (future email/password users only) — authenticated with restricted token until verification completes. `[DESIGN]`
+- **Suspended** — not currently modelled. Do not add unless required by a future batch. `[DESIGN]`
+- **Soft-deleted** — `deleted_at` set. Login rejected. Tokens revoked. Existing behavior preserved. `[IMPLEMENTED]`
+- **Restored** — no user-restore endpoint exists. Not in scope. `[DESIGN]`
+- **Password changed** — other tokens revoked. `[DESIGN]` (no password change endpoint yet).
+- **Password reset `[IMPLEMENTED]`** — all tokens revoked. User must re-authenticate with the new password. See §8.
+- **Google linked** — `google_id` written after authentication. `[IMPLEMENTED]` (only written at Google callback login).
+- **Google unlinked** — only allowed if the account has another primary authentication method. `[DESIGN]`
 
 ---
 
-## 14. Account lifecycle
+## 15. Mobile client contract `[IMPLEMENTED]`
 
-- **Active** — normal.
-- **Unverified** (new email/password users only) — authenticated with restricted token until verification completes.
-- **Suspended** — not currently modelled. Do not add unless required by a future batch.
-- **Soft-deleted** — `deleted_at` set. Login rejected. Tokens revoked. Existing behavior preserved.
-- **Restored** — no user-restore endpoint exists. Not in scope.
-- **Password changed** — other tokens revoked.
-- **Google linked** — `google_id` written after authentication.
-- **Google unlinked** — only allowed if the account has another primary authentication method.
+The mobile client has three authentication paths today.
 
----
-
-## 15. Mobile client contract
-
-Current (Google OAuth only):
+### Google OAuth
 
 ```
 Mobile
@@ -470,59 +615,83 @@ Backend redirects to https://www.aibrooklyn.net?token=<sanctum-token>
 Mobile intercepts redirect and extracts the token
 ```
 
-Future (Email/Password added):
+### Email/password login
 
 ```
 Mobile
   ↓
-POST /api/auth/login with email + password
+POST /api/login with email + password
   ↓
-Backend returns { token, user } in a JSON body
+Backend returns { message, data: { token, user } } in a JSON body
   ↓
 Mobile stores token
 ```
 
-Both flows yield the same kind of token and the same `Authorization: Bearer <token>` usage afterward. No existing mobile behavior changes.
+### Password reset
+
+```
+Mobile
+  ↓
+POST /api/password/forgot with email
+  ↓
+Backend returns generic 200 (no enumeration)
+  ↓
+User receives email with 6-digit OTP
+  ↓
+Mobile prompts for OTP + new password
+  ↓
+POST /api/password/reset with email + code + password
+  ↓
+Backend returns 200 (on success) or 422 (on generic failure)
+  ↓
+Mobile returns to /api/login with the new password
+```
+
+All three flows yield the same kind of Sanctum bearer token and the same
+`Authorization: Bearer <token>` usage afterward.
+
+See `docs/06_MOBILE_API_CONTRACT.md` §13 for the exact request/response contract.
 
 ---
 
-## 16. Migration strategy
+## 16. Migration strategy `[PARTIALLY EXECUTED]`
 
-### Phase A — Baseline preserved
+### Phase A — Baseline preserved `[EXECUTED]`
 
-- No changes.
-- Google login remains the sole production authentication.
+- Google login remains the primary production authentication.
 - Existing users, tokens, and connections are unaffected.
 
-### Phase B — Add Email/Password capability (additive)
+### Phase B — Add Email/Password capability `[PARTIALLY EXECUTED]`
 
-- New endpoints: register, login, password change.
-- Additive columns: `email_verified_at` (nullable).
-- Additive notifications: verification email.
-- Existing Google login untouched.
-- Existing `/api/register` untouched.
-- Rollback: drop the new endpoints and columns; existing users unaffected.
+Shipped:
 
-### Phase C — Safe account linking
+- `POST /api/login` (email/password login, Sanctum token).
+- `POST /api/password/forgot`, `POST /api/password/reset` (password reset via email OTP).
+- `password_reset_otps` table.
+
+Not yet shipped:
+
+- `POST /api/auth/register` (Option 2 in §6.1) — registration still only happens via `/api/register`.
+- `email_verified_at` column and the email verification flow.
+- Rate limiting on `/api/login`, `/api/register`, and the Google auth endpoints.
+
+### Phase C — Safe account linking `[DESIGN]`
 
 - New endpoints: link Google to an authenticated account, unlink if a second method exists.
 - Google callback continues to reject auto-linking.
-- Rollback: remove the linking endpoints; no existing state depends on them.
 
-### Phase D — Security hardening where compatible
+### Phase D — Security hardening where compatible `[DESIGN]`
 
 - Environment gate on `/api/test/login`.
-- Rate limits on new endpoints and on the Google flow.
+- Rate limits on remaining auth endpoints.
 - Encryption of Google tokens on `users` via a migration.
 - Sanctum expiration for **new** tokens only.
-- Rollback: each item is reversible independently.
 
-### Phase E — Legacy improvements requiring coordination
+### Phase E — Legacy improvements requiring coordination `[DESIGN]`
 
 - Second callback path that returns the token in a JSON body.
 - Deprecation window for the `?token=` query parameter.
 - `sub`-first Google lookup with email fallback.
-- Rollback: the legacy path remains live until consumers migrate.
 
 Each phase is independently shippable. None requires the next.
 
@@ -530,22 +699,22 @@ Each phase is independently shippable. None requires the next.
 
 ## 17. Decision table
 
-| # | Decision | Recommended choice | Reason | Production impact |
-| --- | --- | --- | --- | --- |
-| 1 | User identity model | Option A (extend `users`) | Zero migration risk; matches current schema | None |
-| 2 | Google login preservation | Preserve contract as-is | It is live | None |
-| 3 | Email/password login | Add new endpoints; leave `/api/register` untouched | Additive; no contract change | None on existing users |
-| 4 | Account linking | Explicit, authenticated, no email-only auto-link | Prevent account takeover | None on existing users |
-| 5 | Email verification | Required for new password accounts; not retroactive | Prevent fake accounts | None on existing users |
-| 6 | Password reset | New endpoints; token lifecycle standard | Needed for usability | None |
-| 7 | Sanctum expiration | Apply only to new tokens | Avoid breaking live users | None on existing tokens |
-| 8 | Logout behavior | Keep "revoke all tokens"; add per-device logout later | Backward compatible | None |
-| 9 | Per-device sessions | Additive endpoint | Mobile convenience | None |
-| 10 | `has_bot_access` / `access_expiry` | Keep as product entitlement, not authentication | Auth ≠ product access | Preserve current Google callback behavior |
-| 11 | Dev test login | Keep, add environment gate later | Safer dev workflow | None if correctly gated |
-| 12 | Google token storage | Encrypt at rest via additive migration | Data-loss protection | Google tokens keep working after migration |
-| 13 | Token-in-URL | Introduce a second JSON callback path; deprecate over time | Avoid breaking mobile | Requires coordination |
-| 14 | Rate limiting | Add to new endpoints immediately; extend later | Abuse protection | None |
+| # | Decision | Recommended choice | Reason | Production impact | Status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | User identity model | Option A (extend `users`) | Zero migration risk; matches current schema | None | IMPLEMENTED |
+| 2 | Google login preservation | Preserve contract as-is | It is live | None | IMPLEMENTED |
+| 3 | Email/password login | Add new endpoints; leave `/api/register` untouched | Additive; no contract change | None on existing users | IMPLEMENTED |
+| 4 | Account linking | Explicit, authenticated, no email-only auto-link | Prevent account takeover | None on existing users | DESIGN |
+| 5 | Email verification | Required for new password accounts; not retroactive | Prevent fake accounts | None on existing users | DESIGN |
+| 6 | Password reset | Two endpoints; standard OTP lifecycle | Needed for usability | None on existing users | IMPLEMENTED (ADR-030) |
+| 7 | Sanctum expiration | Apply only to new tokens | Avoid breaking live users | None on existing tokens | DESIGN |
+| 8 | Logout behavior | Keep "revoke all tokens"; add per-device logout later | Backward compatible | None | IMPLEMENTED |
+| 9 | Per-device sessions | Additive endpoint | Mobile convenience | None | DESIGN |
+| 10 | `has_bot_access` / `access_expiry` | Keep as product entitlement, not authentication | Auth ≠ product access | Preserve current Google callback behavior | IMPLEMENTED as-is |
+| 11 | Dev test login | Keep, add environment gate later | Safer dev workflow | None if correctly gated | IMPLEMENTED, gate = DESIGN |
+| 12 | Google token storage | Encrypt at rest via additive migration | Data-loss protection | Google tokens keep working after migration | DESIGN |
+| 13 | Token-in-URL | Introduce a second JSON callback path; deprecate over time | Avoid breaking mobile | Requires coordination | DESIGN |
+| 14 | Rate limiting | Add to new endpoints immediately; extend later | Abuse protection | None | PARTIAL — password reset done, others pending |
 
 ---
 
@@ -557,27 +726,35 @@ Each phase is independently shippable. None requires the next.
                  │   (production, unchanged)    │
                  └───────────────┬──────────────┘
                                  │
-                                 │
-                 ┌───────────────▼──────────────┐
-                 │   NEW Email + Password       │
-                 │   (additive endpoints)       │
-                 └───────────────┬──────────────┘
-                                 │
-                                 │
-                        ┌────────▼────────┐
-                        │      User       │
-                        │  (users table)  │
-                        └────────┬────────┘
-                                 │
-                        ┌────────▼────────┐
-                        │  Sanctum Token  │
-                        └────────┬────────┘
-                                 │
-              ┌──────────────────┼──────────────────┐
-              │                  │                  │
-              ▼                  ▼                  ▼
-        Connections         Workflows          Executions
-        (per user)          (per user)         (per user)
+                 ┌───────────────┼──────────────┐
+                 │               │              │
+                 ▼               ▼              ▼
+        ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐
+        │ Email +      │ │ Password     │ │  Google OAuth    │
+        │ Password     │ │ Reset (OTP)  │ │  (new connections│
+        │ Login        │ │              │ │   module)        │
+        └──────┬───────┘ └──────┬───────┘ └────────┬─────────┘
+               │                │                  │
+               └────────┬───────┘                  │
+                        │                          │
+                        ▼                          │
+                ┌───────────────┐                  │
+                │  User         │                  │
+                │  (users table)│                  │
+                └───────┬───────┘                  │
+                        │                          │
+                        ▼                          │
+                ┌───────────────┐                  │
+                │Sanctum Token  │                  │
+                └───────┬───────┘                  │
+                        │                          │
+         ┌──────────────┼──────────────┐           │
+         │              │              │           │
+         ▼              ▼              ▼           ▼
+    Connections    Workflows     Executions   Connections
+    (per user)     (per user)    (per user)   (external account
+                                              OAuth — separate
+                                              from login)
 ```
 
 Separation that must remain:
@@ -592,9 +769,13 @@ Google Identity  ≠  Google Connection
 
 Google identity authenticates the user. Google Connection authorizes the user's ability to call Gmail, Calendar, Sheets, Docs, Analytics on their behalf.
 
+Email/password login and password reset do not interact with Google Connection.
+
 ---
 
 ## 19. Unresolved questions
+
+Remaining open questions (design only, no implementation authorized):
 
 - Should a Google-linked user be able to add a password without re-authenticating to Google?
 - Should password registration be allowed for emails already present in `users` via Google, or should it always route through the linking protocol?
@@ -604,24 +785,44 @@ Google identity authenticates the user. Google Connection authorizes the user's 
 - Should `google_id` mismatches on login be treated as an error or as a silent skip?
 - Should `email` case-folding be normalized on write to prevent duplicate-account races?
 - Should the master-password test login be disabled in staging as well, or only in production?
+- Should rate limits on `/api/login` count the master-password path the same as normal credential failures?
+
+Resolved by implementation:
+
+- ~~What is the password reset flow?~~ — Email OTP, two endpoints. See §8 and ADR-030.
+- ~~Does password reset revoke existing sessions?~~ — Yes, all Sanctum tokens. See §8.3.
+- ~~Should the reset email use the Laravel default template?~~ — No. A project-owned Blade template is used. See §8.6.
 
 ---
 
 ## 20. Implementation-deferred items
 
-Nothing below is authorized for implementation by this document.
+Nothing below is authorized for implementation by this document without explicit
+approval. Items marked **[Phase 9]** are planned for the locked Security Hardening
+phase. Items marked **[Phase 10]** are cleanup. Items marked **[Unphased]** require
+a future decision.
 
-- New auth endpoints (register, login, password change, forgot, reset, verify).
-- Linking and unlinking endpoints.
-- Additive `email_verified_at` column.
-- Sanctum expiration policy for new tokens.
-- Per-device logout endpoint.
-- Environment gating for `/api/test/login`.
-- Rate limiting on existing and new auth endpoints.
-- Encryption of `users.google_access_token` / `users.google_refresh_token`.
-- Second Google callback path that returns JSON.
-- `sub`-first Google lookup with email fallback.
-- Any change to the current Google callback contract.
+- New auth endpoints for the register/change-password flows. **[Unphased]**
+- Linking and unlinking endpoints. **[Unphased]**
+- Additive `email_verified_at` column and verification flow. **[Unphased]**
+- Sanctum expiration policy for new tokens. **[Phase 9]**
+- Per-device logout endpoint. **[Unphased]**
+- Environment gating for `/api/test/login`. **[Phase 9]**
+- Rate limiting on `/api/login`, `/api/register`, and Google auth endpoints. **[Phase 9]**
+- Encryption of `users.google_access_token` / `users.google_refresh_token`. **[Phase 9]**
+- Second Google callback path that returns JSON. **[Unphased]**
+- `sub`-first Google lookup with email fallback. **[Unphased]**
+- Any change to the current Google callback contract. **[Unphased]**
+
+**Removed from the deferred list** (now implemented):
+
+- Password reset endpoints. Implemented. See §8 and ADR-030.
+- Custom password reset email template. Implemented. See §8.6.
+
+**Explicitly rejected:**
+
+- Master OTP for password reset. See ADR-030 §"Explicit non-features".
+- Admin-initiated password reset endpoint. See ADR-030 §"Explicit non-features".
 
 ---
 
@@ -629,21 +830,41 @@ Nothing below is authorized for implementation by this document.
 
 The next design batch, subject to explicit authorization, should cover:
 
-1. Exact HTTP contract for the new email/password endpoints (path, method, request, response, error envelope).
-2. Exact HTTP contract for the linking endpoints.
-3. Email template and verification-link strategy.
-4. Rate-limit values and scopes.
-5. Migration plan for `email_verified_at` and any additive columns.
-6. Rollback plan for each additive change.
-7. Threat model for the linking protocol.
+1. Email verification flow (columns, endpoint contracts, restricted-token scopes).
+2. Account linking and unlinking endpoints (contracts, threat model, rollback).
+3. Rate limits on `/api/login`, `/api/register`, and Google auth endpoints (values, scope, storage backend).
+4. Encryption migration for `users.google_access_token` / `users.google_refresh_token` (rollout plan, `APP_KEY` stability requirements).
+5. Sanctum expiration policy (values, migration strategy for new tokens only).
+6. Second Google callback path (parallel operation window, deprecation timeline).
 
-No implementation follows from this document until you explicitly authorize a specific batch.
+No implementation follows from this document until you explicitly authorize a
+specific batch.
 
 ---
 
 STATUS:
 
-DESIGN ONLY
-NO IMPLEMENTATION AUTHORIZED
+- §1 Baseline: IMPLEMENTED
+- §2 Production compatibility: ACTIVE
+- §3 Identity model: IMPLEMENTED (Option A)
+- §4 Google preservation: IMPLEMENTED as-is
+- §5 Account linking: DESIGN ONLY
+- §6 Email/Password: LOGIN IMPLEMENTED, REGISTER/CHANGE DESIGN
+- §7 Email verification: DESIGN ONLY
+- §8 Password recovery: IMPLEMENTED (ADR-030)
+- §9 Token lifecycle: PARTIAL (reset revokes tokens; expiry design)
+- §10 Google identity vs connection: IMPLEMENTED
+- §11 Entitlements: IMPLEMENTED as-is
+- §12 Dev test login: IMPLEMENTED, gate DESIGN
+- §13 Rate limiting: PARTIAL (password reset done)
+- §14 Account lifecycle: MIXED
+- §15 Mobile client: IMPLEMENTED
+- §16 Migration strategy: PARTIAL
+- §17 Decision table: MIXED
+- §18 Architecture diagram: CURRENT
+- §19-21: DESIGN
+
 PHASE 9 REMAINS LOCKED
 PHASE 10 REMAINS LOCKED
+
+NO IMPLEMENTATION AUTHORIZED BY THIS DOCUMENT

@@ -12,10 +12,13 @@ Target: any Linux server capable of running PHP 8.2+, MySQL 8+, and a web server
 | ----------------------------------- | -------------------------------------------------------------------------- | -------- |
 | PHP-FPM + web server                | Serves the HTTP API                                                        | Yes      |
 | External clock (Google Apps Script) | Calls the internal scheduler tick endpoint every 5 minutes                 | Yes      |
+| Mail transport                      | Delivers password reset OTPs and any future transactional email            | Yes      |
 | Laravel Scheduler (`schedule:run`)  | Not required for the new scheduler path. Retained for CLI/manual use.      | Optional |
 | Queue Worker                        | Not required for the new scheduler path. Retained for legacy/manual flows. | Optional |
 
 Without the external clock, no Gmail polling happens and no scheduled workflows fire.
+
+Without a working mail transport, the password reset flow silently fails to deliver OTPs.
 
 ---
 
@@ -204,7 +207,7 @@ Managed by systemd, supervisor, or a similar process manager. Not required for t
 - `CACHE_STORE` must be a shared, persistent backend (`database` or `redis`). `array` is never acceptable. `file` is acceptable only for single-instance deployments where the scheduler and the web app share the same filesystem.
 - `QUEUE_CONNECTION` must be a persistent backend (`database` or `redis`) if the queue is used. `sync` is acceptable only for local development.
 
-The global tick lock and `ShouldBeUnique` behavior depend on the cache store being cross-process safe.
+The global tick lock, `ShouldBeUnique` behavior, and the password reset rate limiter all depend on the cache store being cross-process safe.
 
 ---
 
@@ -226,6 +229,22 @@ Required for the scheduler:
 - `INTERNAL_SCHEDULER_RATE_LIMIT` — requests per 60-second window.
 - `INTERNAL_SCHEDULER_LOCK_SECONDS` — global lock TTL.
 - `INTERNAL_SCHEDULER_STALE_RUNNING_MINUTES` — stale-running recovery threshold.
+
+Required for password reset (mail delivery — see §17):
+
+- `MAIL_MAILER` — must be `smtp`, `ses`, `postmark`, or `resend`. **Not `log`.**
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_ENCRYPTION`
+- `MAIL_FROM_ADDRESS`, `MAIL_FROM_NAME`
+
+Optional password-reset tuning (defaults are sane):
+
+- `PASSWORD_RESET_CODE_LENGTH` (default `6`)
+- `PASSWORD_RESET_CODE_TTL_MINUTES` (default `15`)
+- `PASSWORD_RESET_MAX_ATTEMPTS` (default `5`)
+- `PASSWORD_RESET_FORGOT_RATE_EMAIL` (default `5`)
+- `PASSWORD_RESET_FORGOT_RATE_IP` (default `20`)
+- `PASSWORD_RESET_RESET_RATE_EMAIL` (default `20`)
+- `PASSWORD_RESET_RESET_RATE_IP` (default `60`)
 
 Persistent storage:
 
@@ -354,11 +373,237 @@ payloads into execution records.
 
 ---
 
-## 16. Deploy checklist
+## 16. Password Reset
+
+Two public endpoints, implemented in the Identity module. See ADR-030 for the
+full decision record and `docs/06_MOBILE_API_CONTRACT.md` §13 for the client
+contract.
+
+### 16.1 Endpoints
+
+- `POST /api/password/forgot` — request a reset code.
+- `POST /api/password/reset` — verify the code and set a new password.
+
+Both are public (no auth). Both are rate limited per email and per IP.
+
+### 16.2 Migration
+
+The feature adds one table:
+
+```
+password_reset_otps
+```
+
+Created by a module-owned migration:
+
+```
+app/Modules/Identity/Infrastructure/Database/Migrations/2026_10_04_000001_create_password_reset_otps_table.php
+```
+
+No existing table is modified. The migration is idempotent (guarded by the
+standard Laravel `Schema::create`), safe to run on production, and does not
+touch any user data.
+
+Deployment command:
+
+```
+php artisan migrate --force
+```
+
+### 16.3 Config
+
+`app/Modules/Identity/Infrastructure/Config/identity.php` is merged at runtime
+via `mergeConfigFrom`. It exposes the `password_reset` config block with sane
+defaults. Override via env vars (see §7).
+
+After editing any password-reset env var, run:
+
+```
+php artisan config:clear
+```
+
+### 16.4 Mail delivery
+
+The OTP is delivered by email via a Laravel notification
+(`PasswordResetOtpNotification`) rendered from a project-owned Blade view:
+
+```
+app/Modules/Identity/Views/emails/password-reset-otp.blade.php
+```
+
+**A working mail transport is required.** Without it, the reset endpoint
+returns its generic 200 response but no OTP ever reaches the user. See §17.
+
+The email body is localized via `identity::messages.*` using the request
+locale (`Accept-Language`, ADR-029). If the mobile client does not send the
+header, the OTP email is sent in English.
+
+### 16.5 Behavior on success
+
+`/api/password/reset` success:
+
+1. The user's password is updated.
+2. All Sanctum tokens for that user are revoked.
+3. Response: HTTP 200 `{ "message": "Password reset successful. Please log in with your new password." }`.
+
+The user must log in again with the new password.
+
+### 16.6 Operational notes
+
+- **OTP lifetime**: 15 minutes. A user who misses the window must request a new code.
+- **Attempt cap**: 5 wrong attempts per code. The 6th attempt rejects the code even if the correct value is later supplied.
+- **Re-issuance**: requesting a new code invalidates the previous one for that email.
+- **Rate limits**: 5/hour per email + 20/hour per IP for `/forgot`; 20/hour per email + 60/hour per IP for `/reset`.
+- **Generic responses**: `/forgot` returns the same 200 whether the email exists or not; `/reset` returns the same 422 for every failure mode. This is intentional anti-enumeration behavior. Do not "improve" the errors without revisiting the decision.
+- **No master OTP, no CLI reset command, no admin endpoint**. These were considered and explicitly rejected. If support needs to reset a user's password urgently, the user must complete the normal flow.
+
+### 16.7 Table maintenance
+
+`password_reset_otps` accumulates one row per email address (unique key). Rows
+are overwritten on re-issuance. A periodic cleanup is recommended:
+
+```php
+// Add to app/Console/Kernel.php or bootstrap/app.php ->withSchedule(...)
+$schedule->call(function () {
+    \App\Modules\Identity\Infrastructure\Eloquent\PasswordResetOtpModel::query()
+        ->where('expires_at', '<', now()->subDay())
+        ->delete();
+})->daily();
+```
+
+Not yet wired. Add as part of a maintenance pass if row count becomes
+meaningful.
+
+### 16.8 Rollback
+
+Reverting the migration and removing the two routes fully disables the feature.
+No other state is affected. Existing users and tokens are untouched.
+
+### 16.9 References
+
+- `docs/03_ARCHITECTURE_DECISIONS.md` — ADR-030
+- `docs/06_MOBILE_API_CONTRACT.md` — §13
+- `docs/07_AUTHENTICATION_ARCHITECTURE.md` — §8
+
+---
+
+## 17. Mail configuration
+
+Password reset requires a working mail transport. This section documents the
+required configuration and the recommended production setup.
+
+### 17.1 The dangerous default
+
+Laravel's default `MAIL_MAILER` is `log`. With that driver:
+
+- No email is sent to users.
+- Every outbound email body — including the 6-digit reset OTP — is written in
+  plaintext to `storage/logs/laravel.log`.
+- Anyone with read access to the log file can read OTP codes as users request
+  them.
+
+**Never run production with `MAIL_MAILER=log`.**
+
+### 17.2 Required environment variables
+
+At minimum:
+
+```env
+MAIL_MAILER=smtp            # or ses, postmark, resend
+MAIL_HOST=...
+MAIL_PORT=...
+MAIL_USERNAME=...
+MAIL_PASSWORD=...
+MAIL_ENCRYPTION=tls         # or ssl, depending on provider
+
+MAIL_FROM_ADDRESS="no-reply@yourdomain.com"
+MAIL_FROM_NAME="BrooklynAI"
+```
+
+`MAIL_FROM_ADDRESS` must be an address you can legitimately send from — the
+provider must allow it, and the domain should have valid SPF and DKIM records
+so mail does not land in spam.
+
+### 17.3 Recommended providers
+
+| Provider | Notes |
+| --- | --- |
+| **Postmark** | Best deliverability for transactional mail. Requires domain authentication. Recommended. |
+| **Amazon SES** | Cheap at scale. Requires verified domain and out-of-sandbox approval. |
+| **Resend** | Modern, simple API. Good default for new projects. |
+| **Gmail SMTP** | Only acceptable for very low volume. Has daily caps (500/day consumer, 2,000/day Workspace) and requires an App Password. Subject to spam filtering. |
+
+**Gmail SMTP is the current setup for early testing.** Migrate to a
+transactional provider before production traffic.
+
+### 17.4 Gmail SMTP setup (if used)
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME="your-account@yourdomain.com"
+MAIL_PASSWORD="your-16-char-app-password"
+MAIL_ENCRYPTION=tls
+
+MAIL_FROM_ADDRESS="your-account@yourdomain.com"
+MAIL_FROM_NAME="BrooklynAI"
+```
+
+Requirements:
+
+- Google 2FA enabled on the sending account.
+- An **App Password** generated at https://myaccount.google.com/apppasswords.
+  Regular Gmail account passwords do not work for SMTP since 2022.
+- `MAIL_USERNAME` and `MAIL_FROM_ADDRESS` must match the account whose App
+  Password was generated — unless a Workspace alias is configured.
+
+### 17.5 Verification after configuration
+
+```bash
+php artisan config:clear
+```
+
+Then trigger a password reset in Postman:
+
+```
+POST {{APP_URL}}/api/password/forgot
+{ "email": "<a real user's email>" }
+```
+
+Confirm the OTP email arrives in the inbox (and check spam). If it does not:
+
+1. Check `storage/logs/laravel.log` for a mailer error.
+2. Common error: `535 Authentication failed` — wrong App Password, missing 2FA, or wrong username.
+3. Common error: `From address not permitted` — From header does not match the authenticated account and no alias is configured.
+4. Common error: `Connection timed out` — the production host cannot reach the SMTP server (firewall).
+
+### 17.6 Per-locale delivery
+
+The email body is rendered in the locale resolved from the request
+`Accept-Language` header (ADR-029). If the mobile client does not send the
+header, emails are sent in English.
+
+This means a user whose phone is in Arabic will only receive Arabic emails if
+the mobile app sends `Accept-Language: ar` on the `/forgot` request. Verify
+this in the mobile client before deployment.
+
+### 17.7 Operational tips
+
+- Monitor bounce and spam rates in the provider dashboard.
+- Keep `MAIL_FROM_ADDRESS` stable. Changing it invalidates any sender reputation the domain has earned.
+- Never include sensitive data in the `Subject`. The OTP email subject is `"Your password reset code"` / `"رمز إعادة تعيين كلمة المرور"` — no code, no PII.
+- Rotate the SMTP password / App Password if a team member with access leaves.
+
+---
+
+## 18. Deploy checklist
 
 ```text
 [ ] APP_KEY set and stable across deploys
 [ ] .env production values populated
+[ ] APP_ENV=production
+[ ] APP_DEBUG=false
 [ ] CACHE_STORE set to persistent shared store
 [ ] QUEUE_CONNECTION set to persistent store (if queue is used)
 [ ] composer install --no-dev --optimize-autoloader
@@ -371,6 +616,12 @@ payloads into execution records.
 [ ] INTERNAL_SCHEDULER_RATE_LIMIT set
 [ ] INTERNAL_SCHEDULER_LOCK_SECONDS set
 [ ] INTERNAL_SCHEDULER_STALE_RUNNING_MINUTES set
+[ ] MAIL_MAILER set to a real transport (NOT log)
+[ ] MAIL_HOST / MAIL_PORT / MAIL_USERNAME / MAIL_PASSWORD / MAIL_ENCRYPTION set
+[ ] MAIL_FROM_ADDRESS set to a domain-verified address
+[ ] MAIL_FROM_NAME set
+[ ] password_reset_otps table migrated (php artisan migrate --force)
+[ ] PASSWORD_RESET_* overrides applied if non-default
 [ ] Google Apps Script configured with Script Properties
 [ ] Apps Script 5-minute trigger installed
 [ ] Google Cloud Console: OAuth redirect URIs include GOOGLE_CONNECTIONS_REDIRECT_URI
@@ -380,7 +631,7 @@ payloads into execution records.
 
 ---
 
-## 17. Post-deployment smoke test
+## 19. Post-deployment smoke test
 
 1. `curl -X POST https://sea-turtle-app-vshwt.ondigitalocean.app/api/internal/scheduler/tick` with no token → 401.
 2. Same with wrong token → 401.
@@ -395,21 +646,38 @@ payloads into execution records.
 11. Verify the Apps Script Executions log shows `Scheduler tick OK: {"ok":true,"processed":1,"executed":1,...}`.
 12. (If the workflow uses `create_draft`, `mark_as_read`, `mark_as_unread`, `archive`, `trash`, `add_label`, `remove_label`, or `create_label`) confirm the connection has been reconnected with the new Gmail scopes.
 
+### Password reset smoke test
+
+13. `POST /api/password/forgot` with a real user email → 200, generic message.
+14. Confirm the OTP email arrives in the user's inbox (not just in logs).
+15. `POST /api/password/reset` with the OTP and a new password → 200.
+16. `POST /api/login` with the new password → 200 with a fresh Sanctum token.
+17. `POST /api/password/forgot` with a non-existent email → 200, same generic message.
+18. `POST /api/password/reset` with the same (now used) code → 422, generic failure.
+19. Repeat `/forgot` six times in quick succession → the 6th returns 429 with a `Retry-After` header.
+
 ---
 
-## 18. Known limitations
+## 20. Known limitations
 
 - DigitalOcean App Platform does not allow multiple long-lived processes in a single Web Service container. The external clock approach (Apps Script) sidesteps this.
 - Apps Script is a single point of failure for the scheduler. If the trigger is disabled or the script is deleted, automation stops.
 - Consumer Apps Script accounts cannot sustain more than ~18 seconds per tick. Long ticks exhaust the daily quota.
 - The new scheduler path is synchronous. Very large batches will exceed the platform HTTP request timeout.
 - Gmail delivery is at-least-once. No exactly-once guarantee.
-- Real Gmail E2E verification of the new Gmail actions and trigger filters is still pending at the time of this document update.
+- Password reset email delivery is **synchronous** inside the HTTP request. Under Gmail SMTP with slow responses, `/api/password/forgot` may take several seconds. Migrating the notification to a queue removes this coupling but requires a queue worker.
+- Gmail SMTP has a daily sending cap (~500/day consumer, ~2,000/day Workspace). This cap is shared across all email the account sends, including password reset OTPs. Migrate to a transactional provider before production volume.
+- Password reset OTPs can land in spam if the sending domain is not SPF/DKIM authenticated.
+- `MAIL_MAILER=log` silently hides OTPs in `storage/logs/laravel.log`. This is a functional and security issue.
+- `password_reset_otps` rows accumulate. No automatic cleanup is scheduled. Rows are unique by email so growth is bounded by the number of distinct email addresses that ever requested a reset, but stale rows are not removed automatically.
+- Real Gmail E2E verification of the Gmail integration was completed. Password reset was verified manually via Postman + Gmail SMTP.
 
 ---
 
-## 19. Contact points for operational rotation
+## 21. Contact points for operational rotation
 
 - `INTERNAL_SCHEDULER_TOKEN` — rotate in both the Laravel `.env` and the Apps Script `ScriptProperties` simultaneously.
+- `MAIL_PASSWORD` / SMTP App Password — rotate via the mail provider dashboard. For Gmail, rotate via Google Account → Security → App Passwords. If the account is compromised, revoke all App Passwords.
+- `MAIL_FROM_ADDRESS` — keep stable. Changing it invalidates sender reputation.
 - Google OAuth credentials — rotate via Google Cloud Console.
 - `APP_KEY` — must remain stable across deploys. Rotating it invalidates encrypted credentials in `connections`.

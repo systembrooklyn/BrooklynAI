@@ -21,12 +21,27 @@ When architectural decisions overlap, the most recent accepted ADR governs the a
 * `Core` as the DDD/domain physical layer
 * module-owned persistence
 * module-owned HTTP
-* module localization
+* module localization directory layout
 * new-code ownership
+
+`ADR-029` is the current locked decision for:
+
+* the localization mechanism
+* supported locales
+* locale resolution rules
+* translation namespaces
+* what is localized and what is not
+
+`ADR-030` is the current locked decision for:
+
+* password reset via email OTP
+* OTP lifecycle and storage
+* reset endpoint contract
+* rate limits and security posture for the reset flow
 
 Earlier ADRs remain historical records.
 
-If an earlier ADR uses terminology or physical structures that are superseded by ADR-028, ADR-028 governs the current implementation.
+If an earlier ADR uses terminology or physical structures that are superseded by ADR-028, ADR-029, or ADR-030, the newer ADR governs the current implementation.
 
 ---
 
@@ -768,14 +783,375 @@ Earlier ADRs remain historical records and must not be interpreted as permission
 
 ---
 
+# ADR-029 — Localization Mechanism
+
+## Status
+
+Accepted / Locked
+
+## Context
+
+The platform serves Arabic-speaking and English-speaking users.
+
+Before this decision, user-facing HTTP responses were hardcoded English across every controller, and the Catalog response had no way to render human-readable labels in Arabic.
+
+The project needed a locale mechanism that:
+
+- works for a mobile-first API client,
+- does not change existing API contract shapes,
+- does not introduce a per-user stored locale (`users.locale`),
+- does not change any machine-readable identifier,
+- does not require touching every controller in a single batch.
+
+The physical module layout for translations (`Lang/{ar,en}/`) was already established by ADR-028.
+
+The mechanism that drives which locale is used at request time was not yet defined.
+
+## Decision
+
+### Mechanism
+
+The only client-facing locale mechanism is the standard HTTP `Accept-Language` request header.
+
+### Supported locales
+
+```text
+en — English (default, fallback)
+ar — Arabic
+```
+
+Any locale outside this set is ignored.
+
+### Resolution rules
+
+1. Parse the `Accept-Language` header.
+2. Split into comma-separated candidates.
+3. Each candidate has an optional `q` weight.
+4. Sort candidates by descending `q`.
+5. Reject any candidate with `q <= 0` (RFC 7231: "not acceptable").
+6. Normalize each candidate by taking the base language tag before the first `-`:
+   - `ar-EG` → `ar`
+   - `en-US` → `en`
+   - `en-GB` → `en`
+7. Select the first normalized candidate present in `config('app.supported_locales')`.
+8. Fallback: if no candidate matches, use `config('app.locale')` if it is in the supported list; otherwise, leave the framework default untouched.
+
+### Middleware
+
+`App\Http\Middleware\SetLocale` implements the resolution and calls `App::setLocale()` with the resolved locale.
+
+The middleware is prepended to the `api` middleware group in `bootstrap/app.php`:
+
+```php
+$middleware->api(prepend: [
+    \App\Http\Middleware\SetLocale::class,
+]);
+```
+
+Prepending ensures the locale is set before `auth:sanctum` runs and before `FormRequest` validation produces messages.
+
+### Configuration
+
+`config/app.php` gains:
+
+```php
+'supported_locales' => ['en', 'ar'],
+```
+
+### Translation namespaces
+
+Each module registers its own translation namespace in its service provider:
+
+```php
+$this->loadTranslationsFrom(__DIR__.'/../../Lang', '<module>');
+```
+
+Existing namespaces:
+
+```text
+automation
+connections
+execution
+identity
+integrations
+```
+
+### What is localized
+
+Localized (HTTP response body only):
+
+- Top-level `message` fields produced by project controllers in the Identity, Automation, Connections, Execution, and Integrations modules where the string was moved to a translation namespace.
+- The Catalog's `name`, `description`, action `label`/`description`, trigger `label`/`description`, field `label`/`description` values. These are resolved server-side via `CatalogProjector` using `*Key` fields on the definition entities (Shape 1: translation keys, not locale arrays).
+- Root API controllers where source files were supplied (`routes/api.php` inline closure, `UserController::register`, `GoogleAuthController::logout`/`deactivateAccount`/callback catch block).
+
+NOT localized:
+
+- `execution_steps.error_message` and `executions.error_message` — internal diagnostics; remain English in the database and in every API response.
+- Raw provider / business-result `message` strings returned inside action result payloads (Google Sheets row-append, Docs append-text, Sheets add/delete/update/clear, etc.). These are part of the business-result body, not the controller envelope.
+- Every `$e->getMessage()` diagnostic payload, Google exception message, `trace`, `file`, `line`.
+- The 401 body `{ "message": "Unauthenticated." }` — emitted by Laravel's authentication middleware, not project code.
+- The top-level 422 body `"The given data was invalid."` — emitted by Laravel's exception handler.
+- Machine-readable identifiers: `integration_key`, `action_key`, `trigger_key`, `provider_key`, field `key`, field `type`, `capability`, `strategy`, `operation_id`, status values, capability error codes, OAuth error query params.
+- User-supplied data (workflow names, email subjects, etc.).
+
+### Explicit non-mechanisms
+
+The following are NOT permitted and are NOT implemented:
+
+- `X-Locale` header.
+- `?locale=` query parameter.
+- Stored per-user locale preference (`users.locale`).
+- Cookie-based locale.
+- Subdomain-based locale.
+
+### Contract addition
+
+`docs/06_MOBILE_API_CONTRACT.md` §12 documents this mechanism.
+
+## Consequences
+
+Positive:
+
+- Mobile clients get localized responses by setting a standard header. No custom client behavior required.
+- Machine-readable identifiers remain stable and locale-independent.
+- Diagnostics remain English, so logs are searchable across locales.
+- The middleware applies to every request, so new controllers inherit localization automatically when they use `__()`.
+- The Shape 1 catalog approach keeps identifiers stable and lets the client receive translated text without any client-side translation layer.
+
+Negative / trade-offs:
+
+- `Accept-Language` parsing is now the single point of locale resolution. Bugs in the parser affect every endpoint.
+- For clients that do not send `Accept-Language`, everything falls back to `en` — there is no user preference persistence across sessions.
+- Raw business-result strings remain English, so mobile must read them defensively.
+- Framework validation overrides for locales other than `en` are not yet shipped (see migration impact below).
+
+## Migration Impact
+
+- No database schema change.
+- No existing API contract shape change.
+- No machine-readable identifier change.
+- No changes to any protected production flow (Google login redirect/callback, `/api/register`, `/api/test/login`, Facebook).
+- No modification of Scheduler, Gmail polling, execution, connections, OAuth, attachments, or Swagger code.
+- Framework `lang/en/validation.php` and `lang/ar/validation.php` overrides are deferred. The framework default `en` validation messages resolve automatically. Per-field 422 messages for locales other than `en` fall back to English until project overrides are added. This is documented in `docs/06_MOBILE_API_CONTRACT.md` §11 and §12.5.
+- Localization of `TestLoginController` and the Facebook controllers is deferred pending source file availability.
+
+## References
+
+- `app/Http/Middleware/SetLocale.php`
+- `bootstrap/app.php`
+- `config/app.php`
+- `docs/06_MOBILE_API_CONTRACT.md` §12
+- `tests/Feature/Localization/SetLocaleTest.php`
+- `tests/Feature/Localization/CatalogTranslationParityTest.php`
+
+---
+
+# ADR-030 — Password Reset via Email OTP
+
+## Status
+
+Accepted / Locked
+
+## Context
+
+Before this decision, the platform had:
+
+- Google OAuth login (production, protected).
+- Email/password login at `POST /api/login` (existing users only).
+- User provisioning at `POST /api/register`.
+- No way for a user who forgot their password to regain access.
+
+Users provisioned via the external Google Apps Script flow or with a password could not self-recover. The only recovery path was direct DB access, which is not a product.
+
+Two flow types were considered:
+
+- **Email link** — classic Laravel default. Awkward for the mobile client because it requires opening a browser and returning to the app.
+- **Email OTP** — a short numeric code the user types back into the mobile app. Mobile-friendly.
+
+## Decision
+
+### Flow type
+
+**Email OTP.**
+
+### Endpoint shape
+
+**Shape B** — two endpoints:
+
+```text
+POST /api/password/forgot    — request a reset code
+POST /api/password/reset     — verify the code and set a new password
+```
+
+Both are public (no authentication required).
+
+### Endpoint location
+
+Implemented inside the Identity module:
+
+```text
+app/Modules/Identity/
+```
+
+Not in the root API controllers. Identity owns authentication.
+
+### OTP lifecycle
+
+- **Code length:** 6 digits.
+- **Character set:** numeric, no leading zero.
+- **TTL:** 15 minutes.
+- **Attempt cap:** 5 wrong attempts per issued code. On the 6th attempt, the code is rejected even if the correct code is later supplied. A new code must be requested.
+- **Storage:** only a bcrypt hash of the code is persisted in the new `password_reset_otps` table. The plain code is never persisted, never logged.
+- **Single-use:** once a code is successfully consumed, it cannot be reused.
+- **Re-issuance:** issuing a new code for the same email overwrites the previous row. Only one active code per email exists at any time.
+
+### `password_reset_otps` table
+
+New module-owned migration:
+
+```text
+app/Modules/Identity/Infrastructure/Database/Migrations/2026_10_04_000001_create_password_reset_otps_table.php
+```
+
+Columns:
+
+- `id`
+- `email` (unique)
+- `code_hash`
+- `attempts` (unsigned tiny int, default 0)
+- `expires_at`
+- `used_at` (nullable)
+- `created_at`, `updated_at`
+
+The existing `password_reset_tokens` table remains unused and unmodified.
+
+### Rate limits
+
+Per email + per IP, tracked via Laravel's `RateLimiter`:
+
+```text
+/api/password/forgot:
+  5 per email per hour
+  20 per IP per hour
+
+/api/password/reset:
+  20 per email per hour
+  60 per IP per hour
+```
+
+Exceeded limits return HTTP 429 with a `Retry-After: 3600` header and a generic body.
+
+### Response semantics
+
+- `/forgot` returns the same generic 200 message whether the email exists or not, to prevent email enumeration.
+- `/reset` returns a single generic 422 for every failure mode (no code, wrong code, expired code, used code, attempts exhausted, unknown email).
+- HTTP status codes and envelope shape are stable.
+
+### Token revocation
+
+On successful reset:
+
+- The user's password is updated.
+- **All active Sanctum tokens for that user are revoked.** The user must log in again with the new password.
+
+### Email delivery
+
+- The reset code is delivered via a Laravel notification (`PasswordResetOtpNotification`).
+- The email body is rendered from a project-owned Blade template at `app/Modules/Identity/Views/emails/password-reset-otp.blade.php`.
+- The email body is localized via `identity::messages.*` using the request locale (`Accept-Language`).
+- The Laravel default mail template is not used.
+- `MAIL_MAILER` must be configured to a real transport in production. The default `log` driver writes the OTP to `storage/logs/laravel.log` and delivers nothing. This is documented in `docs/08_DEPLOYMENT.md`.
+
+### Explicit non-features
+
+The following were considered and are **NOT** implemented:
+
+- **Master OTP.** A shared static code that bypasses the per-email OTP was proposed and explicitly rejected. It would be a privileged backdoor with no per-person audit trail.
+- **CLI reset command.** `php artisan user:reset-password` was proposed as a safer alternative for support use and is not implemented.
+- **Admin reset endpoint.** Not implemented.
+- **Email link flow.** Not implemented.
+- **SMS / WhatsApp delivery.** Not implemented.
+- **Password reset for soft-deleted users.** Not implemented — soft-deleted users cannot reset.
+
+### Config
+
+`app/Modules/Identity/Infrastructure/Config/identity.php` defines:
+
+```php
+'password_reset' => [
+    'code_length'          => env('PASSWORD_RESET_CODE_LENGTH', 6),
+    'code_ttl_minutes'     => env('PASSWORD_RESET_CODE_TTL_MINUTES', 15),
+    'max_attempts'         => env('PASSWORD_RESET_MAX_ATTEMPTS', 5),
+    'forgot_rate_limit_per_email_per_hour' => env('PASSWORD_RESET_FORGOT_RATE_EMAIL', 5),
+    'forgot_rate_limit_per_ip_per_hour'    => env('PASSWORD_RESET_FORGOT_RATE_IP', 20),
+    'reset_rate_limit_per_email_per_hour'  => env('PASSWORD_RESET_RESET_RATE_EMAIL', 20),
+    'reset_rate_limit_per_ip_per_hour'     => env('PASSWORD_RESET_RESET_RATE_IP', 60),
+],
+```
+
+### Swagger
+
+Operations `auth.password.forgot` and `auth.password.reset` added to the `Authentication` tag in `app/Modules/Identity/Swagger/Identity.php`.
+
+## Consequences
+
+Positive:
+
+- Users can self-recover a forgotten password without human intervention.
+- The flow is mobile-friendly (no browser round-trip required after the initial reset-code request).
+- Email enumeration is prevented by design.
+- The password reset revokes all existing sessions, mitigating compromised sessions.
+- The OTP is stored hashed; a database dump does not reveal active codes.
+- The feature lives entirely in the Identity module, following ADR-028.
+- No changes to protected production flows (Google login, `/api/register`, `/api/test/login`, Facebook).
+
+Negative / trade-offs:
+
+- Email delivery must be configured. The default `log` driver writes the OTP to disk — unacceptable in production and documented as a deployment prerequisite.
+- The synchronous email notification blocks the HTTP request. With slow SMTP, `/forgot` may take several seconds. Queueing is a future enhancement.
+- `MAIL_MAILER` misconfiguration silently hides the OTP in log files. The deployment checklist explicitly requires a real transport.
+- Gmail SMTP (the current production setup) caps at ~500 emails/day (regular) or ~2,000/day (Workspace). The project should migrate to a transactional provider (Postmark / SES / Resend) for production volume.
+- No user preference for locale is stored, so the OTP email is sent in whatever locale the client sent via `Accept-Language` on the `/forgot` request. If the client does not send the header, the email is English.
+- No anti-enumeration timing mitigation was added; `/forgot` takes slightly longer when the user exists (SMTP time). Low risk.
+
+## Migration Impact
+
+- **New table:** `password_reset_otps`. Created by a module-owned migration. No existing table is modified.
+- **New config file:** `app/Modules/Identity/Infrastructure/Config/identity.php` merged at runtime.
+- **New mail requirement:** `MAIL_MAILER` must be set to a real transport in production. Documented in `docs/08_DEPLOYMENT.md`.
+- **No change** to:
+  - `App\Models\User`
+  - `LoginAction`, `LoginController`, `LoginRequest`
+  - Google login
+  - `/api/register`
+  - `/api/test/login`
+  - Facebook
+  - Scheduler, Gmail polling, execution, connections, OAuth, attachments, Swagger HTTP contracts for unrelated endpoints
+- **Contract update:** `docs/06_MOBILE_API_CONTRACT.md` §13.
+- **Rollback:** revert the migration and remove the two routes. Existing users are unaffected. No data outside `password_reset_otps` is touched.
+
+## References
+
+- `app/Modules/Identity/Application/Services/PasswordResetService.php`
+- `app/Modules/Identity/Http/Controllers/RequestPasswordResetController.php`
+- `app/Modules/Identity/Http/Controllers/ResetPasswordController.php`
+- `app/Modules/Identity/Infrastructure/Database/Migrations/2026_10_04_000001_create_password_reset_otps_table.php`
+- `app/Modules/Identity/Infrastructure/Notifications/PasswordResetOtpNotification.php`
+- `app/Modules/Identity/Views/emails/password-reset-otp.blade.php`
+- `docs/06_MOBILE_API_CONTRACT.md` §13
+- `docs/08_DEPLOYMENT.md` (§ mail configuration)
+- `tests/Feature/Identity/PasswordResetTest.php`
+
+---
+
 # Future ADRs
 
 New decisions should use:
 
 ```text
-ADR-029
-ADR-030
 ADR-031
+ADR-032
+ADR-033
 ...
 ```
 
@@ -789,4 +1165,4 @@ Each new decision should include:
 
 Do not rewrite old decisions to hide historical changes.
 
-If a future decision changes ADR-028, it must explicitly identify the affected ADR-028 rule and explain the reason for the change.
+If a future decision changes ADR-028, ADR-029, or ADR-030, it must explicitly identify the affected rule and explain the reason for the change.

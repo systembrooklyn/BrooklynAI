@@ -28,7 +28,7 @@ Modules: `Identity`, `Integrations`, `Connections`, `Automation`, `Execution`.
 
 ## Phase
 
-All planned pre-production work is COMPLETE. Production Scheduler Hardening Batches 1–8 are complete. The Gmail integration has been completed for the current MVP scope and has been verified end-to-end against a real Gmail account. No new numbered phase has been opened. Production has not been deployed.
+All planned pre-production work is COMPLETE. Production Scheduler Hardening Batches 1–8 are complete. The Gmail integration has been completed for the current MVP scope and has been verified end-to-end against a real Gmail account. Localization (Batches 1–4) is complete. Password Reset (Forgot Password) is implemented and verified against Gmail SMTP. Root API Controller localization is complete for the controllers whose source files were supplied. No new numbered phase has been opened. Production has not been deployed.
 
 ## Status
 
@@ -39,6 +39,9 @@ Production Scheduler Hardening Batches 1–8 COMPLETE.
 Gmail Integration Completion COMPLETE / CLOSED / VERIFIED.
 Gmail E2E verification COMPLETE / VERIFIED.
 Strategy test coverage COMPLETE.
+Localization (Batches 1–4) COMPLETE.
+Root API Controller Localization COMPLETE (subject to file availability).
+Password Reset COMPLETE.
 No new numbered phase has been opened.
 Production has NOT been deployed.
 ```
@@ -69,6 +72,9 @@ Production has NOT been deployed.
 - Strategy test coverage — COMPLETE / VERIFIED
 - Gmail Integration Completion — COMPLETE / CLOSED / VERIFIED
 - Gmail E2E verification — COMPLETE / VERIFIED
+- Localization (Batches 1–4) — COMPLETE
+- Root API Controller Localization — COMPLETE (subject to file availability)
+- Password Reset (Forgot Password) — COMPLETE
 
 Phase 9 remains LOCKED. Phase 10 remains LOCKED.
 
@@ -248,6 +254,12 @@ Status: `COMPLETE / CLOSED / VERIFIED` (human approved).
 - Generic `401 { "message": "Invalid credentials." }` for all credential failures.
 - `has_bot_access` not required, not modified.
 - `access_expiry` not modified.
+
+## Login rate limiting
+
+**Not yet applied.** A rate-limited version of `LoginController` was proposed during the pre-production review (5 attempts per email+IP per minute, returns HTTP 429 with a `Retry-After` header, counter cleared on success). It has not been integrated into the codebase.
+
+If/when applied, update this section to reflect it and adjust `docs/06_MOBILE_API_CONTRACT.md` §1.7 accordingly.
 
 ---
 
@@ -896,6 +908,212 @@ This pass has since been extended by the "Gmail E2E Verification Pass" section a
 
 ---
 
+# Localization (Batches 1–4)
+
+Status: `COMPLETE`.
+
+This branch added first-class Arabic + English localization to the API surface, driven by the standard `Accept-Language` header. No `X-Locale`, no `?locale`, no stored user locale.
+
+## Batch 1 — Locale infrastructure
+
+Status: `COMPLETE`.
+
+Files created:
+
+- `app/Http/Middleware/SetLocale.php`
+- `tests/Feature/Localization/SetLocaleTest.php` — 6 tests
+
+Files modified:
+
+- `bootstrap/app.php` — `$middleware->api(prepend: [SetLocale::class])`
+- `config/app.php` — added `'supported_locales' => ['en', 'ar']`
+
+Behaviour:
+
+- `Accept-Language` parsed with q-values.
+- Regional subtags normalized (`ar-EG` → `ar`, `en-US` → `en`).
+- `q=0` skipped.
+- Fallback to `config('app.locale')`.
+- Middleware prepended to the `api` group, so it runs before `auth:sanctum` and before FormRequest validation.
+
+**Framework validation overrides deferred.** `lang/en/validation.php` and `lang/ar/validation.php` were not created because the root `lang/` directory was not supplied. Only the framework default English validation messages are guaranteed to resolve. Per-field 422 messages for locales other than `en` fall back to English until project overrides are added. See Deferred/Future list.
+
+## Batch 2 — Identity localization
+
+Status: `COMPLETE`.
+
+Files created:
+
+- `app/Modules/Identity/Lang/en/messages.php`
+- `app/Modules/Identity/Lang/ar/messages.php`
+- `tests/Feature/Localization/IdentityLocalizationTest.php`
+
+Files modified:
+
+- `app/Modules/Identity/Infrastructure/Providers/IdentityServiceProvider.php` — `loadTranslationsFrom(__DIR__.'/../../Lang', 'identity')`
+- `app/Modules/Identity/Http/Controllers/LoginController.php` — localize `login_success`, `invalid_credentials`
+
+## Batch 3 — Integrations + Catalog localization
+
+Status: `COMPLETE`.
+
+Files created:
+
+- `app/Modules/Integrations/Lang/en/messages.php`
+- `app/Modules/Integrations/Lang/ar/messages.php`
+- `app/Modules/Integrations/Lang/en/catalog.php`
+- `app/Modules/Integrations/Lang/ar/catalog.php`
+- `tests/Feature/Localization/IntegrationsLocalizationTest.php`
+- `tests/Feature/Localization/CatalogLocalizationTest.php`
+- `tests/Feature/Localization/CatalogTranslationParityTest.php`
+
+Files modified:
+
+- `app/Modules/Integrations/Infrastructure/Providers/IntegrationsServiceProvider.php` — added `loadTranslationsFrom`
+- `app/Modules/Integrations/Core/Entities/IntegrationDefinition.php` — added `nameKey`, `descriptionKey`
+- `app/Modules/Integrations/Core/Entities/ActionDefinition.php` — added `labelKey`, `descriptionKey`
+- `app/Modules/Integrations/Core/Entities/TriggerDefinition.php` — added `labelKey`, `descriptionKey`
+- `app/Modules/Integrations/Core/ValueObjects/FieldDefinition.php` — added `labelKey`, `descriptionKey`
+- `app/Modules/Integrations/Application/Services/CatalogProjector.php` — resolve via `__()` with English fallback
+- `app/Modules/Integrations/Infrastructure/Google/GmailIntegration.php`
+- `app/Modules/Integrations/Infrastructure/Google/GoogleCalendarIntegration.php`
+- `app/Modules/Integrations/Infrastructure/Google/GoogleSheetsIntegration.php`
+- `app/Modules/Integrations/Infrastructure/Google/GoogleDocsIntegration.php`
+- `app/Modules/Integrations/Infrastructure/Google/GoogleAnalyticsIntegration.php`
+- `app/Modules/Integrations/Infrastructure/Google/GoogleDriveIntegration.php`
+- 31 controllers under `app/Modules/Integrations/Http/Controllers/` — controller-level `message` / `error` strings localized
+
+**Deferred by design:** raw business-result `message` strings returned inside action result payloads (Sheets row-append result, Docs append-text result, Sheets add/delete/update/clear result). These are part of the business-result body, not the controller envelope, and remain English.
+
+## Batch 4 — Contract + verification
+
+Status: `COMPLETE`.
+
+- `docs/06_MOBILE_API_CONTRACT.md` bumped to v1.0.7. New §12 (Localization) added. Old §12 renamed to §13.
+
+Verification evidence:
+
+- `php artisan test --filter=CatalogTranslationParityTest` → 2 passed / 16 assertions.
+- `php artisan test --filter=SetLocaleTest` → 6 passed / 12 assertions.
+- Tinker manual checks confirmed `identity::messages.invalid_credentials`, `identity::messages.login_success`, and `integrations::catalog.google_gmail.actions.send_email.label` all resolve correctly under `en` and `ar`.
+- Recursive key-tree diff between `en/catalog.php` and `ar/catalog.php` returned empty on both sides (parity holds).
+
+## Root API Controller Localization
+
+Status: `COMPLETE` (subject to file availability).
+
+Files modified:
+
+- `routes/api.php` — inline `/user` closure now uses `__('identity::messages.user_retrieved')`
+- `app/Http/Controllers/Api/UserController.php` — `user_registered`, `user_updated`
+- `app/Http/Controllers/Api/GoogleAuthController.php` — `login_failed`, `logout_success`, `account_deactivated`
+
+Translation keys added to `app/Modules/Identity/Lang/{en,ar}/messages.php`:
+
+- `user_retrieved`
+- `user_registered`
+- `user_updated`
+- `logout_success`
+- `account_deactivated`
+- `login_failed`
+
+**Not localized:** `TestLoginController` and the Facebook controllers — their source files were not supplied. Endpoints remain English. See Deferred/Future list.
+
+---
+
+# Password Reset (Forgot Password)
+
+Status: `COMPLETE`.
+
+Two public endpoints support password reset via email OTP. Implemented inside the Identity module.
+
+## Endpoints
+
+- `POST /api/password/forgot` — request a reset code.
+- `POST /api/password/reset` — verify the code and set a new password.
+
+## Behaviour
+
+- 6-digit numeric OTP, uniformly random, no leading zero.
+- 15-minute TTL.
+- 5-attempt cap per issued code.
+- Only a bcrypt hash of the code is stored (`password_reset_otps.code_hash`).
+- Single-use. New issuance invalidates prior codes for the same email.
+- Rate limits: 5 per email + 20 per IP per hour (forgot); 20 per email + 60 per IP per hour (reset).
+- Generic response on `/forgot` (no email enumeration).
+- Generic 422 on every reset failure mode.
+- On success, all active Sanctum tokens for the user are revoked.
+- Email body localized via `identity::messages.*`, rendered from a custom Blade view (no Laravel default branding).
+
+## Files created
+
+- `app/Modules/Identity/Infrastructure/Config/identity.php` — `password_reset` config block
+- `app/Modules/Identity/Infrastructure/Database/Migrations/2026_10_04_000001_create_password_reset_otps_table.php`
+- `app/Modules/Identity/Infrastructure/Eloquent/PasswordResetOtpModel.php`
+- `app/Modules/Identity/Infrastructure/Repositories/EloquentPasswordResetOtpRepository.php`
+- `app/Modules/Identity/Infrastructure/Notifications/PasswordResetOtpNotification.php`
+- `app/Modules/Identity/Views/emails/password-reset-otp.blade.php`
+- `app/Modules/Identity/Core/Entities/PasswordResetOtp.php`
+- `app/Modules/Identity/Core/Repositories/PasswordResetOtpRepository.php`
+- `app/Modules/Identity/Core/Exceptions/InvalidPasswordResetCodeException.php`
+- `app/Modules/Identity/Application/Services/PasswordResetService.php`
+- `app/Modules/Identity/Application/DTOs/RequestPasswordResetInput.php`
+- `app/Modules/Identity/Application/DTOs/ResetPasswordInput.php`
+- `app/Modules/Identity/Application/Actions/RequestPasswordResetAction.php`
+- `app/Modules/Identity/Application/Actions/ResetPasswordAction.php`
+- `app/Modules/Identity/Http/Requests/RequestPasswordResetRequest.php`
+- `app/Modules/Identity/Http/Requests/ResetPasswordRequest.php`
+- `app/Modules/Identity/Http/Controllers/RequestPasswordResetController.php`
+- `app/Modules/Identity/Http/Controllers/ResetPasswordController.php`
+- `tests/Feature/Identity/PasswordResetTest.php` — written, not yet executed against a test DB
+
+## Files modified
+
+- `app/Modules/Identity/Infrastructure/Providers/IdentityServiceProvider.php` — added `mergeConfigFrom`, `loadMigrationsFrom`, repository bind, service singleton
+- `app/Modules/Identity/Http/Routes/api.php` — two new POST routes
+- `app/Modules/Identity/Lang/en/messages.php` — reset-related keys
+- `app/Modules/Identity/Lang/ar/messages.php` — reset-related keys
+- `app/Modules/Identity/Swagger/Identity.php` — two new OpenAPI operations
+- `docs/06_MOBILE_API_CONTRACT.md` — new §13 documenting the feature
+
+## Migration
+
+`2026_10_04_000001_create_password_reset_otps_table.php` creates the `password_reset_otps` table. Schema:
+
+- `id`
+- `email` (unique)
+- `code_hash`
+- `attempts` (unsigned tiny int, default 0)
+- `expires_at`
+- `used_at` (nullable)
+- `created_at`, `updated_at`
+
+No existing table is modified. No data is deleted.
+
+## Production requirements
+
+- `MAIL_MAILER` must be configured to a real transport (SMTP, SES, Postmark, Resend). Default `log` writes the OTP to `storage/logs/laravel.log`.
+- `MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME` must be set.
+- `php artisan migrate` must have run.
+
+## Security notes
+
+- Master OTP backdoor was considered and **explicitly rejected**. Not implemented.
+- Operator-driven CLI password reset was considered and not implemented.
+
+## Verification
+
+- Postman test of `/forgot` returned the generic 200 message and delivered the email to the configured Gmail SMTP.
+- Postman test of `/reset` succeeded with the received code, updated the password, revoked all tokens.
+- Postman test of `/login` with the new password returned HTTP 200 with a fresh token.
+- Full-flow is COMPLETE / VERIFIED manually.
+
+## Documentation
+
+Contract §13 documents the feature end-to-end. Swagger operations `auth.password.forgot` and `auth.password.reset` added under the `Authentication` tag.
+
+---
+
 # Cumulative Test Growth
 
 | Phase / Batch                                        | Total Tests | Total Assertions |
@@ -919,11 +1137,21 @@ This pass has since been extended by the "Gmail E2E Verification Pass" section a
 | Post scheduler Batches 1–4                           | 698         | 2090             |
 | Post scheduler + strategy coverage                   | 704         | 2117             |
 | Post scheduler hardening close                       | 709         | 2127             |
-| **Gmail Integration Completion close (current)**     | **752**     | **2267**         |
+| Gmail Integration Completion close                   | 752         | 2267             |
+| **Localization + Password Reset (current)**          | **752**     | **2267**         |
 
-Historical numbers through Batch 7.3 are preserved exactly as recorded at their respective closures.
+The Localization batches and Password Reset feature **added new test files** that are documented in their respective sections above but have **not been executed** in this environment. The test count therefore remains at the last-verified figure of 752 / 2267.
 
-The Gmail E2E Verification Pass did not add or change automated tests; it is a manual live-verification pass. Test count remains 752 / 2267.
+**New test files not yet accounted for in the totals:**
+
+- `tests/Feature/Localization/SetLocaleTest.php` — 6 tests / 12 assertions (executed; passed; included in the current total only if the last full-suite run was after Batch 1)
+- `tests/Feature/Localization/IdentityLocalizationTest.php` — written, not yet executed
+- `tests/Feature/Localization/IntegrationsLocalizationTest.php` — written, not yet executed
+- `tests/Feature/Localization/CatalogLocalizationTest.php` — written, not yet executed
+- `tests/Feature/Localization/CatalogTranslationParityTest.php` — 2 tests / 16 assertions (executed; passed)
+- `tests/Feature/Identity/PasswordResetTest.php` — written, not yet executed
+
+Once these are executed, the totals must be updated. Localization tests that use `RefreshDatabase` require a dedicated test database or `:memory:` SQLite; do not run them against a shared DB.
 
 ---
 
@@ -931,20 +1159,20 @@ The Gmail E2E Verification Pass did not add or change automated tests; it is a m
 
 The following remain unchanged and intact:
 
-- All legacy `app/Http/Controllers/Api/*` Google/Facebook/TestLogin/User controllers.
+- All legacy `app/Http/Controllers/Api/*` Google/Facebook/TestLogin/User controllers (except for the localized strings listed in the Root API Controller Localization section above).
 - `app/Services/*`.
 - `app/Models/User.php`, `app/Models/FacebookAccount.php`.
-- All existing global migrations under `database/migrations/`.
-- `config/*` except the published `config/l5-swagger.php` and `config/internal_scheduler.php`.
+- All existing global migrations under `database/migrations/` (new `password_reset_otps` migration was added inside the Identity module).
+- `config/*` except the published `config/l5-swagger.php`, `config/internal_scheduler.php`, and the newly added `config/identity.php` merged at runtime.
 - `bootstrap/*` except the additive `IdentityServiceProvider` line.
 - All Phase 0–7 tests.
 
-Live Google login (`redirect` / `callback`) untouched.
+Live Google login (`redirect` / `callback`) untouched except for the localized `login_failed` string in the catch block. No contract change.
 `users.google_access_token`, `users.google_refresh_token`, `users.google_token_expires_at` untouched.
 `redirectgoogle()` legacy flow untouched.
 `TestLoginController` untouched.
 Facebook functionality untouched.
-`POST /api/register` behaviorally untouched.
+`POST /api/register` behaviorally untouched except for localized response strings.
 `has_bot_access` untouched.
 
 ---
@@ -962,13 +1190,17 @@ Facebook functionality untouched.
 9. `app/Services/GoogleAnalyticsService.php` — orphaned
 10. `tests/Feature/Connections/GoogleCallbackTest.php` — two commented-out method bodies
 11. Resolver naming asymmetry (`GoogleCredentialsResolver` interface vs `GoogleCredentialResolver` implementation)
-12. `env()` reads for Google client id/secret in infrastructure classes
+12. `env()` reads for Google client id/secret in infrastructure classes (still present in 15 files across `app/Modules/Connections/Infrastructure/Google/**` and `app/Modules/Integrations/Infrastructure/Google/**`). Blocks `config:cache` in production.
 13. Commented legacy route blocks in `routes/api.php`
 14. `GmailService` has no active consumer but is retained
 15. `WorkflowSnapshotBuilder::stepSnapshot()` — dead code introduced during Batch 6.4
 16. Pint — 8 files flagged with style issues in `app/Modules/Automation`, `app/Modules/Execution`, `tests/Feature/Execution`, `tests/Feature/Automation`. Not yet applied.
 17. `RunWorkflowJob` is no longer dispatched by the new scheduler path. Kept for legacy/manual flows.
 18. Scheduler tick unauthenticated body mismatch (`{"message":"Unauthenticated."}` vs declared `{"error":"unauthorized"}`). Investigate in a maintenance pass.
+19. Login endpoint rate limiting — corrected `LoginController` proposed but not applied.
+20. Root `lang/en/validation.php` and `lang/ar/validation.php` — not created; per-field 422 messages only resolve for `en`.
+21. `TestLoginController` — not localized (source file not supplied).
+22. `FacebookAuthController` and `FacebookWebhookController` — not localized (source files not supplied).
 
 ---
 
@@ -996,6 +1228,30 @@ Locked unless a new ADR changes them.
 - `/api/login` authenticates existing users only.
 - `has_bot_access` / `access_expiry` are product entitlements, not authentication.
 - `App\Models\User` remains shared application infrastructure.
+
+## Localization
+
+- Only `Accept-Language`. No `X-Locale`, no `?locale`, no `users.locale`.
+- Supported locales: `en`, `ar`. Fallback `en`.
+- Region subtags normalized. q-weighted. `q=0` skipped.
+- Middleware `SetLocale` prepended to the `api` group.
+- Module translation namespaces via `loadTranslationsFrom` in each module's service provider.
+- Framework validation overrides deferred.
+- Machine-readable identifiers never translated.
+- Execution diagnostics remain English.
+- Raw business-result payloads deferred.
+
+## Password Reset
+
+- Two endpoints: `/api/password/forgot`, `/api/password/reset`.
+- 6-digit OTP, 15-min TTL, 5-attempt cap.
+- Bcrypt-hashed storage in `password_reset_otps`.
+- Rate-limited per email + per IP.
+- Generic responses (no enumeration).
+- All Sanctum tokens revoked on success.
+- No master OTP.
+- No CLI reset command.
+- Email body localized via `identity::messages.*`.
 
 ## Integrations
 
@@ -1103,7 +1359,7 @@ Locked unless a new ADR changes them.
 
 - Empty `config` serializes as JSON object `{}`, not array `[]`, in Catalog and Trigger responses.
 
-## Gmail Integration Completion (current)
+## Gmail Integration Completion
 
 - Ten Gmail actions wired and registered in `HandlerRegistry`.
 - Trigger `new_email_received` extended with `from`, `subject`, `has_attachment`, `query`; `label_id` remains separate.
@@ -1116,10 +1372,10 @@ Locked unless a new ADR changes them.
 ## Deferred / Future
 
 - Email verification flow.
-- Password reset flow.
 - Per-device token revocation.
 - Refresh-token / long-lived token policy.
-- Rate limiting on auth endpoints.
+- Rate limiting on `/api/login` (corrected controller proposed; not applied).
+- Rate limiting on the Google auth redirect/callback (design-only).
 - Encryption of `users.google_access_token` / `users.google_refresh_token`.
 - Google OAuth hardening (token-in-URL callback).
 - `requires_connection` catalog flag.
@@ -1139,6 +1395,12 @@ Locked unless a new ADR changes them.
 - Live `missing_scopes` verification against an old-scope-only Google connection.
 - Optional clean negative-case retest of the `is:unread` filter.
 - Investigation of the scheduler tick unauthenticated response body mismatch.
+- Framework `lang/en/validation.php` and `lang/ar/validation.php` overrides (per-field 422 messages for locales other than `en`).
+- Localization of `TestLoginController` (source file not supplied).
+- Localization of `FacebookAuthController` and `FacebookWebhookController` (source files not supplied).
+- Localization of raw business-result `message` strings embedded in action result payloads.
+- Master OTP for internal password reset — explicitly rejected.
+- CLI password reset command — proposed but not implemented.
 - Any additional capability not explicitly approved.
 
 ---
@@ -1146,32 +1408,44 @@ Locked unless a new ADR changes them.
 # Current Task
 
 ```text
-Phase 0–8 and the post-Phase-8 branches are COMPLETE / CLOSED / VERIFIED.
+Phase 0–8 and all recorded post-Phase-8 branches are COMPLETE / CLOSED / VERIFIED.
 
 Production Scheduler Hardening Batches 1–8 are COMPLETE / VERIFIED.
 Gmail Integration Completion is COMPLETE / CLOSED / VERIFIED for the MVP scope.
 Gmail E2E verification is COMPLETE / VERIFIED against a real Gmail account.
 Strategy test coverage is COMPLETE / VERIFIED.
 
-The scheduler path is synchronous, uses a dedicated internal tick endpoint
-authenticated by a bearer token, holds a global lock, performs stale-running
-recovery, queries due triggers generically, and dispatches through a
-coordinator to strategies that call RunWorkflowAction synchronously.
-No queue worker is required for the new scheduler path.
+Localization (Batches 1–4) is COMPLETE:
+- Accept-Language middleware operational.
+- Identity, Automation, Connections, Execution, and Integrations modules
+  localized via module translation namespaces.
+- Catalog labels/descriptions localized server-side via Shape 1 key-based
+  resolution with English fallback.
+- Root API controllers localized where source files were supplied.
+- Verified: CatalogTranslationParityTest (2/16), SetLocaleTest (6/12), plus
+  manual Tinker checks of Identity and Catalog translation keys under en + ar.
 
-Google Apps Script is installed as the external 5-minute clock.
+Root API Controller Localization is COMPLETE where source files were
+available. TestLoginController and the Facebook controllers remain
+English-only pending file availability.
+
+Password Reset (Forgot Password) is COMPLETE:
+- Two public endpoints, OTP-based, email delivery via Laravel notification.
+- Custom Blade email template, localized under en + ar.
+- Rate-limited per email and per IP.
+- All Sanctum tokens revoked on successful reset.
+- Verified end-to-end manually via Postman + Gmail SMTP.
+
+The scheduler path is unchanged since scheduler hardening close: synchronous,
+dedicated internal tick endpoint, bearer token, global lock, stale-running
+recovery, coordinator dispatch, strategies call RunWorkflowAction
+synchronously. No queue worker.
+
+Google Apps Script remains installed as the external 5-minute clock.
 
 Latest verified full-suite run: 752 passed / 2267 assertions / 0 failures.
-
-Gmail E2E verification confirmed:
-- All 10 Gmail actions work against a real mailbox.
-- All trigger filters work (has_attachment negative case verified live;
-  is:unread negative case covered indirectly through shared composer path).
-- Multi-step execution works.
-- Inter-step {{ steps.N.output.* }} template resolution works.
-- Hero workflow (trigger -> mark_as_read -> reply_to_email) completes with
-  correct Gmail thread and read-state side effects.
-- All 21 protected endpoints return 401 unauthenticated.
+This count predates the Localization + Password Reset test files. Those
+files are written but not yet executed in this environment.
 
 Production has NOT been deployed.
 Phase 9 remains LOCKED.
@@ -1190,13 +1464,20 @@ Await explicit human authorization for the next approved step.
 Remaining planned work:
 - Phase 9 — Security Hardening (LOCKED).
 - Phase 10 — Legacy Deprecation / Cleanup (LOCKED).
+- Post-localization docs audit (in progress).
+- Optional: apply the corrected LoginController rate limit.
+- Optional: publish framework validation overrides (lang/en/validation.php,
+  lang/ar/validation.php).
+- Optional: localize TestLoginController and the Facebook controllers once
+  their source files are supplied.
+- Optional: run the Localization + Password Reset test files against a
+  dedicated test DB or :memory: SQLite, and update the cumulative test count.
 - Optional clean negative retest of the is:unread filter.
 - Live missing_scopes verification against an old-scope-only Google connection.
-- Future Gmail capabilities (attachments).
 
 Production-environment verification (env vars, cache store, Apps Script
-ScriptProperties, migrate --force, first live tick) is required before any
-deployment.
+ScriptProperties, mail transport, migrate --force, first live tick) is
+required before any deployment.
 ```
 
 No cleanup, no refactor, and no new code is authorized by this state file alone.

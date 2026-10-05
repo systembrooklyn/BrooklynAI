@@ -2,8 +2,8 @@
 
 Status: read-only contract derived from the currently implemented API.
 
-Version: 1.0.7
-Last updated: after Localization (Batches 1–4).
+Version: 1.0.8
+Last updated: after Root API Controller Localization + Password Reset doc alignment.
 
 This document is written for the mobile developer. It describes only behavior that exists in the backend today. Anything not present in the code is explicitly marked NOT IMPLEMENTED or DEFERRED.
 
@@ -71,6 +71,8 @@ Response (HTTP 200):
 
 Unauthenticated → HTTP 401.
 
+The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
+
 ### 1.3 Logout
 
 ```
@@ -85,6 +87,8 @@ Response (HTTP 200):
 ```json
 { "message": "Successfully logged out." }
 ```
+
+The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
 
 ### 1.4 Account deactivation
 
@@ -101,6 +105,8 @@ Response (HTTP 200):
 ```json
 { "message": "Your account has been deactivated successfully." }
 ```
+
+The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
 
 ### 1.5 Test / dev-only login — NOT for production
 
@@ -140,6 +146,14 @@ Response (HTTP 200):
 - It must **not** be used as the production authentication path.
 - It bypasses normal identity verification: it does not check the user's own password.
 
+**Production safety warning.** This endpoint must be disabled in production.
+Its current route registration is not environment-gated. Until it is gated
+(planned for Phase 9 Security Hardening), the deployment must ensure the route
+is unreachable in production by any means available (server-level blocking,
+reverse-proxy deny rule, or network restriction). Leaving it reachable in
+production is a full authentication bypass for any user whose email is known
+to the caller.
+
 Ownership note: anyone who knows the master password and the target email can obtain a token for that user. It exists only for local development. Do not build the mobile production authentication flow on it.
 
 ### 1.6 How the mobile client obtains a token
@@ -174,7 +188,6 @@ Authorization: Bearer <token>
 **What does NOT exist today:**
 
 - Email verification flow.
-- Password reset flow.
 - Refresh-token mechanism.
 - Per-device token revocation.
 
@@ -213,6 +226,7 @@ Success (HTTP 200):
 
 - `data.token` is the Sanctum bearer token. Use it as `Authorization: Bearer <token>` on subsequent requests.
 - `data.user` follows the same field shape used by `GET /api/user` (§1.2).
+- The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
 
 Invalid credentials (HTTP 401):
 
@@ -251,7 +265,7 @@ Validation failure (HTTP 422):
 - Login does not create users. Users must be provisioned first (via the existing business flow that calls `POST /api/register`, or via the Google flow for existing users).
 - Login does not touch Google fields.
 - Login does not normalize email casing.
-- Login does not apply rate limiting (not implemented anywhere in the project today).
+- **Login rate limiting is NOT yet active.** A rate-limited `LoginController` (5 attempts per email+IP per minute; returns HTTP 429 with a `Retry-After` header on exceed; counter cleared on success) was proposed during the pre-production review. It is not applied. Until it is, mobile should not assume throttling behavior — the endpoint accepts unlimited attempts today. Planned for Phase 9 Security Hardening.
 
 **Operator master password (migration phase).** During the current migration away
 from `/api/test/login`, `POST /api/login` also accepts a master password configured
@@ -282,6 +296,18 @@ Body: {
 - **Does not return a Sanctum token.**
 - `has_bot_access` is set based on `today() < access_expiry`.
 - This endpoint is used by an existing external provisioning flow (Google Apps Script). It is not a public signup form.
+- Response `message` localizes when the request carries `Accept-Language: ar` — see §12.
+
+### 1.9 Password reset (forgot password)
+
+Two public endpoints support password reset via email OTP. See §13 for the full contract.
+
+```
+POST /api/password/forgot    — request a reset code
+POST /api/password/reset     — verify the code and set a new password
+```
+
+Both are public. Both return generic responses to prevent email enumeration. See §13.
 
 ---
 
@@ -557,6 +583,10 @@ operation. `from`, `subject`, `has_attachment`, and `query` are plain inputs:
 
 These filters only affect which messages the trigger considers. They do not
 change the trigger payload shape or the execution model.
+
+**Catalog labels localize.** Every `label` and `description` value inside the
+catalog response is resolved server-side based on the request `Accept-Language`
+header — see §12. The identifiers and the JSON shape do not change.
 
 ### 4.4 Action object
 
@@ -1557,6 +1587,8 @@ Returned by any route under `auth:sanctum` when the token is missing or invalid.
 
 **Exception:** `POST /api/login` returns `{ "message": "Invalid credentials." }` (also HTTP 401) for credential failures — see §1.7. That is the login-specific 401 body, not the middleware 401.
 
+The 401 body itself is not localized. Treat HTTP 401 as a state code and do not depend on the message text — see §12.3.
+
 ### 7.2 Validation (422)
 
 ```json
@@ -1828,6 +1860,8 @@ Production-ready today:
 
 - `POST /api/register` — provisioning (creates/updates users; no token).
 - `POST /api/login` — email/password login returning a Sanctum token.
+- `POST /api/password/forgot` — request a password reset code.
+- `POST /api/password/reset` — reset the password with a valid code.
 - `GET /api/auth/google/redirect` — Google login redirect.
 - `GET /api/auth/google/callback` — Google login callback.
 - `POST /api/logout` — revoke tokens.
@@ -1858,7 +1892,7 @@ Production-ready today:
 
 Non-production:
 
-- `POST /api/test/login` — dev-only.
+- `POST /api/test/login` — dev-only. Must not be reachable in production. See §1.5.
 
 The ten Gmail actions (`send_email`, `reply_to_email`, `create_draft`,
 `mark_as_read`, `mark_as_unread`, `archive`, `trash`, `add_label`,
@@ -1871,9 +1905,10 @@ with `integration_key = "google.gmail"` and the corresponding `action_key`).
 ## 11. Deferred functionality Mobile must not depend on
 
 - Email verification flow. Not implemented.
-- Password reset flow. Not implemented.
 - Refresh-token / long-lived token policy. Not implemented.
 - Per-device token revocation. Not implemented.
+- Login endpoint rate limiting. Proposed, not yet applied. See §1.7.
+- Environment gating of `/api/test/login`. The endpoint is dev-only by convention but is not environment-gated at the route level. Planned for Phase 9 Security Hardening.
 - `requires_connection` catalog flag. Not implemented.
 - **Catalog-level output schema declaration.** The catalog exposes action inputs only. Output keys are documented in §5.9 of this contract. There is currently no `outputSchema` field in the catalog response — mobile must hardcode the output keys from §5.9 for Gmail actions, and must not assume any output keys for Calendar / Sheets / Docs / Analytics.
 - Field metadata for Calendar / Sheets / Docs / Analytics actions. Not implemented.
@@ -1883,6 +1918,8 @@ with `integration_key = "google.gmail"` and the corresponding `action_key`).
 - Retry / DLQ infrastructure. Not implemented.
 - Catalog caching / ETag / multi-endpoint catalog. Not implemented.
 - Project-supplied `lang/{locale}/validation.php` overrides. As of this contract version, only the framework default `en` translations are guaranteed. Per-field 422 messages for locales other than `en` fall back to the framework default until project overrides are added.
+- Localization of `TestLoginController` and the Facebook controllers. Their source files were not supplied during the localization pass. They remain English-only. `/api/test/login` is dev-only in any case.
+- Localization of raw business-result `message` strings embedded inside action result payloads (for example, Google Sheets row-append result `message`, Google Docs append-text result `message`). These are part of the business-result body, not the controller envelope, and remain English.
 
 ---
 
@@ -1918,8 +1955,18 @@ Localized (HTTP response body only):
 - Top-level `message` fields produced by project controllers in the Identity,
   Automation, Connections, Execution, and Integrations modules where the
   string was moved to a translation namespace.
+- Top-level `message` / `error` fields on the root API endpoints whose source
+  controller was supplied during the localization pass:
+    - `GET /api/user` (inline closure in `routes/api.php`)
+    - `POST /api/register` (`UserController::register`)
+    - `POST /api/logout` (`GoogleAuthController::logout`)
+    - `POST /api/account/deactivate` (`GoogleAuthController::deactivateAccount`)
+    - `GET /api/auth/google/callback` catch-block `error` string
+  These reuse the `identity::messages.*` namespace.
 - All `label` and `description` strings inside the `GET /api/catalog`
   response, for every integration, action, trigger, and config field.
+- The `message` field on the two password reset endpoints (`/api/password/forgot`,
+  `/api/password/reset`) and the body of the OTP email.
 
 NOT localized (remains English, by design):
 
@@ -2044,6 +2091,8 @@ Rate limits:
 Exceeded limits → HTTP 429 `{ "message": "Too many requests. Please try again later." }`
 with a `Retry-After` header.
 
+The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
+
 ### 13.3 Reset password
 
 ```
@@ -2096,6 +2145,8 @@ Behavior on success:
 - All active Sanctum tokens for that user are revoked. The user must log in
   again with the new password.
 
+The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
+
 ### 13.4 Security notes
 
 - The reset code is a 6-digit numeric OTP, uniformly random, no leading zero.
@@ -2112,7 +2163,7 @@ Behavior on success:
 
 ### 13.5 What the OTP email contains
 
-The reset email is a standard Laravel mail notification. It contains:
+The reset email is a project-owned Blade template rendered by Laravel. It contains:
 
 - A greeting with the user's name.
 - The 6-digit code.
@@ -2126,7 +2177,7 @@ header (see §12). The email body text is localized via `identity::messages.*`.
 
 - `MAIL_MAILER` must be configured to a real mailer (SMTP, SES, Postmark, etc.).
   The default `log` driver writes emails to `storage/logs/laravel.log` and
-  delivers nothing.
+  delivers nothing. Anyone with log access can read OTP codes.
 - `MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME` must be configured.
 - The `password_reset_otps` table must be migrated.
 
@@ -2150,12 +2201,16 @@ A: Three:
 - Production email/password login (`POST /api/login`) — for users who have a password set via the provisioning flow (`POST /api/register`) or another path.
 - Dev-only `/api/test/login` for local development.
 
-All three return a Sanctum bearer token, which the mobile client uses identically.
+All three return a Sanctum bearer token, which the mobile client uses identically. Password reset (`/api/password/forgot` + `/api/password/reset`) is a separate recovery flow — it does not issue a token; the user logs in again with the new password.
 
 **Q: Can a workflow have multiple steps that reference each other?**
 
 A: Yes. Steps can reference an earlier step's output via `{{ steps.N.output.<key> }}`, where `N` is the 1-based position of an earlier step in the same workflow. The referenced `<key>` must be one of the keys that the earlier step's action actually returns. The verified output keys for all Gmail actions are listed in §5.9. A full worked example is in §5.18. Whole-template resolution preserves the resolved value's type; invalid or future-step references fail the step at runtime with a descriptive `error_message`.
 
+**Q: Does the API support Arabic and English responses?**
+
+A: Yes. Every user-facing `message`/`error` field produced by project controllers localizes based on the standard `Accept-Language` request header, as do all catalog `label`/`description` values. Machine-readable identifiers, HTTP status codes, and response envelope shapes are identical across locales. Execution diagnostics, raw provider messages, and Laravel-emitted framework strings (401 body, 422 top-level message) remain English. Full details in §12.
+
 **Q: Can the Mobile Developer start integrating tomorrow?**
 
-A: Yes. Use `/api/login` for users who have email/password credentials, or the Google OAuth flow for users who sign in with Google. Every endpoint needed to build the automation UI is present, authenticated, and owner-scoped. The Catalog uses the same canonical identifiers as the Workflow API, so no client-side mapping layer is required. See §5.7 for the one config-handling pitfall (`label_id`) that must be handled correctly on the mobile side. See §3.5 for the Gmail reconnect requirement when the user wants to use the newer Gmail actions. See §5.9 for the verified output keys per Gmail action, and §5.17 and §5.18 for how to build multi-step workflows with `{{ steps.N.output.* }}` references. See §12 for localization.
+A: Yes. Use `/api/login` for users who have email/password credentials, or the Google OAuth flow for users who sign in with Google. Every endpoint needed to build the automation UI is present, authenticated, and owner-scoped. The Catalog uses the same canonical identifiers as the Workflow API, so no client-side mapping layer is required. See §5.7 for the one config-handling pitfall (`label_id`) that must be handled correctly on the mobile side. See §3.5 for the Gmail reconnect requirement when the user wants to use the newer Gmail actions. See §5.9 for the verified output keys per Gmail action, and §5.17 and §5.18 for how to build multi-step workflows with `{{ steps.N.output.* }}` references. See §12 for localization. See §13 for the password reset contract.
