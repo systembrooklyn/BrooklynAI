@@ -18,7 +18,14 @@ return [
     'password_reset_email_code' => 'Reset code: :code',
     'password_reset_email_expiry' => 'This code expires in :minutes minutes.',
     'password_reset_email_line_2' => "If you didn't request this, you can safely ignore this email.",
-
     'password_reset_email_code_label' => 'Your reset code',
     'password_reset_email_footer' => "If you didn't request this email, no action is needed.",
+
+    // Root API controllers (auth-adjacent endpoints outside the Identity module)
+    'user_retrieved' => 'User Retrieved successfully',
+    'user_registered' => 'User registered successfully',
+    'user_updated' => 'User updated Successfully',
+    'logout_success' => 'Successfully logged out.',
+    'account_deactivated' => 'Your account has been deactivated successfully.',
+    'login_failed' => 'Login failed',
 ];

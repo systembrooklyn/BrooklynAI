@@ -61,7 +61,7 @@ class GoogleAuthController extends Controller
         try {
 
             $googleUser = Socialite::driver('google')->stateless()->user();
-            // $googleUser = Socialite::driver('google')->user(); 
+            // $googleUser = Socialite::driver('google')->user();
             // $user = User::withTrashed()->where('google_id', $googleUser->id)->first();
             $user = User::withTrashed()->where('email', $googleUser->email)->first();
             // If user exists but is soft-deleted
@@ -118,8 +118,9 @@ class GoogleAuthController extends Controller
             //     'email' => $user->email,
             // ]);
             // Redirect to HTML page with token & user data as query params
-            return redirect()->away(url('https://www.aibrooklyn.net?token=' . urlencode($token)
-                ));
+            return redirect()->away(url(
+                'https://www.aibrooklyn.net?token=' . urlencode($token)
+            ));
 
 
 
@@ -135,7 +136,7 @@ class GoogleAuthController extends Controller
         } catch (\Exception $e) {
             // Log::error('Google Login Error: ' . $e->getMessage());
             return response()->json([
-                'error' => 'Login failed',
+                'error' => __('identity::messages.login_failed'),
                 'message' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -158,7 +159,7 @@ class GoogleAuthController extends Controller
         $request->user()->tokens()->delete();
 
         return response()->json([
-            'message' => 'Successfully logged out.'
+           'message' => __('identity::messages.logout_success'),
         ]);
     }
 
@@ -186,7 +187,7 @@ class GoogleAuthController extends Controller
         $user->tokens()->delete();
 
         return response()->json([
-            'message' => 'Your account has been deactivated successfully.'
+            'message' => __('identity::messages.account_deactivated'),
         ]);
     }
 }

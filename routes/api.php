@@ -22,7 +22,7 @@ Route::post('/register', [UserController::class, 'register']);
 // Public routes (no auth required)
 Route::get('/user', function (Request $request) {
     return response()->json([
-        'message' => 'User Retrieved successfully',
+        'message' => __('identity::messages.user_retrieved'),
         'data' => $request->user()->only(['id', 'name', 'avatar', 'email', 'has_bot_access', 'access_expiry']),
     ]);
 })->middleware('auth:sanctum');

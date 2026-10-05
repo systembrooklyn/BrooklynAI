@@ -19,7 +19,14 @@ return [
     'password_reset_email_code' => 'رمز إعادة التعيين: :code',
     'password_reset_email_expiry' => 'ينتهي هذا الرمز خلال :minutes دقيقة.',
     'password_reset_email_line_2' => 'إذا لم تطلب ذلك، يمكنك تجاهل هذا البريد الإلكتروني بأمان.',
-
     'password_reset_email_code_label' => 'رمز إعادة التعيين',
     'password_reset_email_footer' => 'إذا لم تطلب هذا البريد الإلكتروني، فلا يلزم أي إجراء.',
+
+    // Root API controllers (auth-adjacent endpoints outside the Identity module)
+    'user_retrieved' => 'تم استرجاع بيانات المستخدم بنجاح',
+    'user_registered' => 'تم تسجيل المستخدم بنجاح',
+    'user_updated' => 'تم تحديث بيانات المستخدم بنجاح',
+    'logout_success' => 'تم تسجيل الخروج بنجاح.',
+    'account_deactivated' => 'تم تعطيل حسابك بنجاح.',
+    'login_failed' => 'فشل تسجيل الدخول',
 ];

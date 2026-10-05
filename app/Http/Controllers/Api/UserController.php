@@ -22,7 +22,7 @@ class UserController extends Controller
         ]);
         $user = User::where('email', $request->email)->first();
         $hasAccess = today() < $request->access_expiry ? 1 : 0;
-        $resMsg = 'User registered successfully';
+        $resMsg = __('identity::messages.user_registered');
         $resCode = 201;
         if (!$user) {
             //create user
@@ -40,7 +40,7 @@ class UserController extends Controller
                 'access_expiry' => $request->access_expiry,
                 'has_bot_access' => $hasAccess
             ]);
-            $resMsg = 'User updated Successfully';
+            $resMsg = __('identity::messages.user_updated');
             $resCode = 200;
         }
         //return response
