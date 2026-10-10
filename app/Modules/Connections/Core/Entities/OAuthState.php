@@ -8,23 +8,33 @@ final class OAuthState
 {
     public const TTL_SECONDS = 600;
 
+    public const PLATFORM_WEB = 'web';
+    public const PLATFORM_MOBILE = 'mobile';
+
     public function __construct(
         public readonly ?int $id,
         public readonly string $state,
         public readonly int $userId,
         public readonly string $provider,
+        public readonly string $platform,
         public readonly array $scopesRequested,
         public readonly DateTimeImmutable $expiresAt,
         public readonly ?DateTimeImmutable $consumedAt,
     ) {}
 
-    public static function generate(int $userId, string $provider, array $scopes, DateTimeImmutable $now): self
-    {
+    public static function generate(
+        int $userId,
+        string $provider,
+        array $scopes,
+        DateTimeImmutable $now,
+        string $platform = self::PLATFORM_WEB,
+    ): self {
         return new self(
             id: null,
             state: bin2hex(random_bytes(32)),
             userId: $userId,
             provider: $provider,
+            platform: $platform,
             scopesRequested: array_values($scopes),
             expiresAt: $now->modify('+'.self::TTL_SECONDS.' seconds'),
             consumedAt: null,
@@ -39,5 +49,10 @@ final class OAuthState
     public function isConsumed(): bool
     {
         return $this->consumedAt !== null;
+    }
+
+    public function isMobile(): bool
+    {
+        return $this->platform === self::PLATFORM_MOBILE;
     }
 }

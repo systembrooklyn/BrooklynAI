@@ -20,8 +20,11 @@ final class StartGoogleConnectionAction
         private readonly CapabilityScopeMap $capabilities,
     ) {}
 
-    public function execute(int $userId, ?string $capability = null): string
-    {
+    public function execute(
+        int $userId,
+        ?string $capability = null,
+        string $platform = OAuthState::PLATFORM_WEB,
+    ): string {
         $scopes = self::SCOPES;
 
         if ($capability !== null) {
@@ -36,6 +39,7 @@ final class StartGoogleConnectionAction
             provider: self::PROVIDER,
             scopes: $scopes,
             now: new DateTimeImmutable,
+            platform: $platform,
         );
 
         $this->states->save($state);

@@ -5,7 +5,9 @@ namespace App\Modules\Connections\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Connections\Application\Actions\HandleGoogleCallbackAction;
 use App\Modules\Connections\Application\Actions\StartGoogleConnectionAction;
+use App\Modules\Connections\Core\Entities\OAuthState;
 use App\Modules\Connections\Core\Exceptions\OAuthException;
+use App\Modules\Connections\Core\Repositories\OAuthStateRepository;
 use App\Modules\Connections\Http\Requests\StartGoogleConnectionRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +16,8 @@ use Throwable;
 
 class GoogleConnectionController extends Controller
 {
+    private const HEADER_CLIENT_PLATFORM = 'X-Client-Platform';
+
     public function start(
         StartGoogleConnectionRequest $request,
         StartGoogleConnectionAction $action,
@@ -22,9 +26,12 @@ class GoogleConnectionController extends Controller
             ? (string) $request->input('capability')
             : null;
 
+        $platform = $this->resolveRequestedPlatform($request);
+
         $url = $action->execute(
             userId: (int) $request->user()->id,
             capability: $capability,
+            platform: $platform,
         );
 
         return response()->json([
@@ -34,33 +41,96 @@ class GoogleConnectionController extends Controller
 
     public function callback(Request $request, HandleGoogleCallbackAction $action): Response
     {
-        $redirectBase = config('connections.frontend_redirect');
+        $stateParam = $request->query('state');
+        $codeParam  = $request->query('code');
 
-        if (! is_string($redirectBase) || $redirectBase === '') {
+        // Resolve the state row once. The platform stored on the row
+        // determines the redirect target.
+        $state = is_string($stateParam) && $stateParam !== ''
+            ? app(OAuthStateRepository::class)->findByState($stateParam)
+            : null;
+
+        $redirectBase = $this->resolveRedirectBase($state);
+        $isMobile = $state !== null && $state->isMobile();
+
+        if ($redirectBase === null) {
             // Configuration error. Do not leak internal details.
             return response()->json(['error' => 'server_misconfigured'], 500);
         }
 
-        $state = $request->query('state');
-        $code = $request->query('code');
-
-        if (! is_string($state) || $state === '') {
-            return redirect()->away($this->appendQuery($redirectBase, 'error', 'oauth_state_invalid'));
+        if (! is_string($stateParam) || $stateParam === '') {
+            return $this->failureRedirect($redirectBase, $isMobile, 'oauth_state_invalid');
         }
 
-        if (! is_string($code) || $code === '') {
-            return redirect()->away($this->appendQuery($redirectBase, 'error', 'oauth_code_exchange_failed'));
+        if (! is_string($codeParam) || $codeParam === '') {
+            return $this->failureRedirect($redirectBase, $isMobile, 'oauth_code_exchange_failed');
         }
 
         try {
-            $action->execute($code, $state);
+            $action->execute($codeParam, $stateParam);
         } catch (OAuthException $e) {
-            return redirect()->away($this->appendQuery($redirectBase, 'error', $e->errorCode()));
+            return $this->failureRedirect($redirectBase, $isMobile, $e->errorCode());
         } catch (Throwable) {
-            return redirect()->away($this->appendQuery($redirectBase, 'error', 'oauth_connection_failed'));
+            return $this->failureRedirect($redirectBase, $isMobile, 'oauth_connection_failed');
         }
 
-        return redirect()->away($this->appendQuery($redirectBase, 'status', 'connected'));
+        return $this->successRedirect($redirectBase, $isMobile);
+    }
+
+    /**
+     * Read the X-Client-Platform header. Only the exact value "mobile"
+     * (case-insensitive, trimmed) is recognised. Every other value —
+     * including a missing header — falls back to web.
+     */
+    private function resolveRequestedPlatform(Request $request): string
+    {
+        $value = $request->header(self::HEADER_CLIENT_PLATFORM);
+
+        if (is_string($value) && strtolower(trim($value)) === OAuthState::PLATFORM_MOBILE) {
+            return OAuthState::PLATFORM_MOBILE;
+        }
+
+        return OAuthState::PLATFORM_WEB;
+    }
+
+    /**
+     * Look up the base redirect URL from the state's platform. Unknown
+     * or missing state defaults to web.
+     */
+    private function resolveRedirectBase(?OAuthState $state): ?string
+    {
+        $platform = $state?->platform ?? OAuthState::PLATFORM_WEB;
+
+        $key = $platform === OAuthState::PLATFORM_MOBILE
+            ? 'connections.frontend_redirect_mobile'
+            : 'connections.frontend_redirect';
+
+        $value = config($key);
+
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    private function successRedirect(string $base, bool $isMobile): Response
+    {
+        if ($isMobile) {
+            return redirect()->away($this->appendQuery($base, 'status', 'success'));
+        }
+
+        // Web behaviour is preserved: ?status=connected
+        return redirect()->away($this->appendQuery($base, 'status', 'connected'));
+    }
+
+    private function failureRedirect(string $base, bool $isMobile, string $errorCode): Response
+    {
+        if ($isMobile) {
+            $url = $this->appendQuery($base, 'status', 'failed');
+            $url = $this->appendQuery($url, 'error', $errorCode);
+
+            return redirect()->away($url);
+        }
+
+        // Web behaviour is preserved: ?error=<code>
+        return redirect()->away($this->appendQuery($base, 'error', $errorCode));
     }
 
     private function appendQuery(string $base, string $key, string $value): string

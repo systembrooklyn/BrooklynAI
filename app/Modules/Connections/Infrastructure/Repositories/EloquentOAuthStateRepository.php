@@ -16,6 +16,7 @@ final class EloquentOAuthStateRepository implements OAuthStateRepository
         $model->state = $state->state;
         $model->user_id = $state->userId;
         $model->provider = $state->provider;
+        $model->platform = $state->platform;
         $model->scopes_requested = $state->scopesRequested;
         $model->consumed_at = $state->consumedAt;
         $model->expires_at = $state->expiresAt;
@@ -48,6 +49,7 @@ final class EloquentOAuthStateRepository implements OAuthStateRepository
             state: (string) $model->state,
             userId: (int) $model->user_id,
             provider: (string) $model->provider,
+            platform: (string) ($model->platform ?? OAuthState::PLATFORM_WEB),
             scopesRequested: is_array($model->scopes_requested) ? $model->scopes_requested : [],
             expiresAt: $this->toImmutable($model->expires_at) ?? new DateTimeImmutable,
             consumedAt: $this->toImmutable($model->consumed_at),

@@ -12,6 +12,7 @@ class OAuthStateModel extends Model
         'state',
         'user_id',
         'provider',
+        'platform',
         'scopes_requested',
         'consumed_at',
         'expires_at',
