@@ -7,6 +7,7 @@ use DateTimeInterface;
 use Google\Service\Gmail\Message as GoogleGmailMessage;
 use Google\Service\Gmail\MessagePart as GoogleGmailMessagePart;
 use Google\Service\Gmail\MessagePartBody as GoogleGmailMessagePartBody;
+use App\Modules\Connections\Core\ValueObjects\ResolvedGoogleCredentials;
 
 final class GmailMessagePayloadBuilder
 {
@@ -109,7 +110,7 @@ final class GmailMessagePayloadBuilder
 
         $parts = preg_split('/\s*,\s*/', $trimmed) ?: [];
         $parts = array_map('trim', $parts);
-        $parts = array_filter($parts, static fn (string $p) => $p !== '');
+        $parts = array_filter($parts, static fn(string $p) => $p !== '');
 
         return array_values($parts);
     }
@@ -211,6 +212,77 @@ final class GmailMessagePayloadBuilder
 
         foreach ($part->getParts() ?? [] as $child) {
             $this->collectAttachmentIds($child, $ids);
+        }
+    }
+    /**
+     * Build the enriched, attachment-aware payload.
+     *
+     * Returns the same 14 keys as build(), plus a 15th key `attachments`.
+     * Attachments are materialized via the supplied materializer, which
+     * downloads each Gmail attachment and uploads it to the user's Drive.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildWithAttachments(
+        GoogleGmailMessage $message,
+        ResolvedGoogleCredentials $credentials,
+        GmailAttachmentMaterializer $materializer,
+    ): array {
+        $payload = $this->build($message);
+
+        $parts = $this->extractAttachmentParts($message);
+
+        $payload['attachments'] = $materializer->materialize(
+            $credentials,
+            (string) $message->getId(),
+            $parts,
+        );
+
+        return $payload;
+    }
+
+    /**
+     * @return array<int, array{attachment_id: string, filename: string, mime_type: string, size: int|null}>
+     */
+    private function extractAttachmentParts(GoogleGmailMessage $message): array
+    {
+        $payload = $message->getPayload();
+
+        if ($payload === null) {
+            return [];
+        }
+
+        $parts = [];
+        $this->collectAttachmentParts($payload, $parts);
+
+        return $parts;
+    }
+
+    /**
+     * @param  array<int, array{attachment_id: string, filename: string, mime_type: string, size: int|null}>  $parts
+     */
+    private function collectAttachmentParts(GoogleGmailMessagePart $part, array &$parts): void
+    {
+        $body = $part->getBody();
+        $attachmentId = $body?->getAttachmentId();
+
+        if (is_string($attachmentId) && $attachmentId !== '') {
+            $filename = $part->getFilename();
+            $mimeType = $part->getMimeType();
+            $size = $body?->getSize();
+
+            $parts[] = [
+                'attachment_id' => $attachmentId,
+                'filename' => is_string($filename) ? $filename : '',
+                'mime_type' => is_string($mimeType) && $mimeType !== ''
+                    ? $mimeType
+                    : 'application/octet-stream',
+                'size' => is_int($size) ? $size : null,
+            ];
+        }
+
+        foreach ($part->getParts() ?? [] as $child) {
+            $this->collectAttachmentParts($child, $parts);
         }
     }
 }

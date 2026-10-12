@@ -17,12 +17,33 @@ use App\Modules\Execution\Core\Exceptions\ExecutionAlreadyRunningException;
 use App\Modules\Execution\Core\Exceptions\WorkflowNotExecutableException;
 use App\Modules\Execution\Core\Repositories\ExecutionRepository;
 use App\Modules\Integrations\Application\Actions\FetchGmailTriggerMessagesAction;
+use App\Modules\Integrations\Application\Actions\FetchGmailTriggerMessagesWithAttachmentsAction;
 use App\Modules\Integrations\Application\DTOs\FetchGmailTriggerMessagesInput;
 use App\Modules\Integrations\Core\Exceptions\GmailProviderException;
 use App\Modules\Integrations\Infrastructure\Google\Gmail\GmailTriggerQueryComposer;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * The single Gmail polling strategy.
+ *
+ * Two trigger keys share this strategy:
+ *
+ *   new_email_received
+ *     → existing lightweight path. 14-key payload produced by
+ *       GmailMessagePayloadBuilder::build(). No attachment work.
+ *
+ *   new_email_received_with_attachment
+ *     → attachment-aware path. Same cursor, same idempotency key
+ *       format, same self-email filter, same ordering. Additionally
+ *       ensures has:attachment is present in the Gmail query and
+ *       dispatches to the attachment-aware fetch action, which
+ *       materializes attachments into the user's Drive and adds the
+ *       `attachments` key to the payload.
+ *
+ * There is exactly one polling mechanism. There is no second cursor,
+ * no second scheduler, no second idempotency mechanism.
+ */
 final class GmailPollStrategy implements TriggerStrategy
 {
     private const STRATEGY_KEY = 'poll';
@@ -30,6 +51,12 @@ final class GmailPollStrategy implements TriggerStrategy
     private const INTEGRATION_KEY = 'google.gmail';
 
     private const TRIGGER_KEY = 'new_email_received';
+
+    private const TRIGGER_KEY_WITH_ATTACHMENT = 'new_email_received_with_attachment';
+
+    private const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+    private const HAS_ATTACHMENT_QUERY_FRAGMENT = 'has:attachment';
 
     // Overlap window covers the full external tick interval (5 minutes) plus
     // a 1-minute safety margin. A shorter window would lose messages that were
@@ -46,6 +73,7 @@ final class GmailPollStrategy implements TriggerStrategy
         private readonly ConnectionRepository $connections,
         private readonly ExecutionRepository $executions,
         private readonly FetchGmailTriggerMessagesAction $fetch,
+        private readonly FetchGmailTriggerMessagesWithAttachmentsAction $fetchWithAttachments,
         private readonly RunWorkflowAction $runWorkflow,
         private readonly GmailTriggerQueryComposer $queryComposer,
     ) {}
@@ -64,9 +92,28 @@ final class GmailPollStrategy implements TriggerStrategy
             return StrategyResult::skipped('missing_workflow_id');
         }
 
-        if ($trigger->integrationKey !== self::INTEGRATION_KEY
-            || $trigger->triggerKey !== self::TRIGGER_KEY) {
+        if (
+            $trigger->integrationKey !== self::INTEGRATION_KEY
+            || ! in_array(
+                $trigger->triggerKey,
+                [self::TRIGGER_KEY, self::TRIGGER_KEY_WITH_ATTACHMENT],
+                true,
+            )
+        ) {
             return StrategyResult::skipped('unsupported_trigger');
+        }
+
+        $isAttachmentTrigger = $trigger->triggerKey === self::TRIGGER_KEY_WITH_ATTACHMENT;
+
+        // The attachment-aware trigger requires a Drive-capable connection.
+        // This check happens before any cursor or execution work so that a
+        // missing scope does not advance the cursor — the next tick will
+        // retry once the user connects Drive.
+        if (
+            $isAttachmentTrigger
+            && ! $this->connectionHasDriveScope($workflow->userId, $trigger->connectionId)
+        ) {
+            return StrategyResult::skipped('drive_connection_required');
         }
 
         if ($this->executions->hasInProgressForWorkflow((int) $workflow->id)) {
@@ -86,23 +133,31 @@ final class GmailPollStrategy implements TriggerStrategy
 
         $query = $this->queryComposer->compose($trigger->config);
 
+        if ($isAttachmentTrigger) {
+            $query = $this->withHasAttachmentFilter($query);
+        }
+
         $after = max($trigger->pollCursor - self::OVERLAP_SECONDS, 0);
 
+        $input = new FetchGmailTriggerMessagesInput(
+            userId: $workflow->userId,
+            connectionId: $trigger->connectionId,
+            afterEpochSeconds: $after,
+            labelIds: $labelIds,
+            query: $query,
+        );
+
         try {
-            $fetched = $this->fetch->execute(new FetchGmailTriggerMessagesInput(
-                userId: $workflow->userId,
-                connectionId: $trigger->connectionId,
-                afterEpochSeconds: $after,
-                labelIds: $labelIds,
-                query: $query,
-            ));
+            $fetched = $isAttachmentTrigger
+                ? $this->fetchWithAttachments->execute($input)
+                : $this->fetch->execute($input);
         } catch (GmailProviderException $e) {
             if ($e->retryable) {
                 return StrategyResult::skipped('gmail_transient_failure');
             }
 
             throw $e;
-        } catch (GoogleCredentialsUnavailableException|ConnectionNotFoundException) {
+        } catch (GoogleCredentialsUnavailableException | ConnectionNotFoundException) {
             return StrategyResult::skipped('credentials_unavailable');
         }
 
@@ -129,7 +184,7 @@ final class GmailPollStrategy implements TriggerStrategy
 
         foreach ($payloads as $payload) {
             $messageId = (string) $payload['message_id'];
-            $idempotencyKey = 'gmail:'.$workflow->id.':'.$messageId;
+            $idempotencyKey = 'gmail:' . $workflow->id . ':' . $messageId;
 
             if ($this->executions->findByIdempotencyKey((int) $workflow->id, $idempotencyKey) !== null) {
                 continue;
@@ -144,7 +199,7 @@ final class GmailPollStrategy implements TriggerStrategy
                     triggerSource: 'poll',
                 ));
                 $executed++;
-            } catch (WorkflowNotFoundException|WorkflowNotExecutableException) {
+            } catch (WorkflowNotFoundException | WorkflowNotExecutableException) {
                 continue;
             } catch (ExecutionAlreadyRunningException) {
                 break;
@@ -154,6 +209,30 @@ final class GmailPollStrategy implements TriggerStrategy
         $this->advanceState($trigger, $now, $maxSeenSeconds);
 
         return StrategyResult::executed($executed);
+    }
+
+    private function connectionHasDriveScope(int $userId, ?int $connectionId): bool
+    {
+        if ($connectionId === null) {
+            return false;
+        }
+
+        $connection = $this->connections->findForUser($userId, $connectionId);
+
+        return $connection !== null && $connection->hasScope(self::DRIVE_FILE_SCOPE);
+    }
+
+    private function withHasAttachmentFilter(?string $query): string
+    {
+        if ($query === null || trim($query) === '') {
+            return self::HAS_ATTACHMENT_QUERY_FRAGMENT;
+        }
+
+        if (str_contains($query, self::HAS_ATTACHMENT_QUERY_FRAGMENT)) {
+            return $query;
+        }
+
+        return $query . ' ' . self::HAS_ATTACHMENT_QUERY_FRAGMENT;
     }
 
     private function advanceState(WorkflowTrigger $trigger, DateTimeImmutable $now, ?int $maxSeenSeconds): void
@@ -179,7 +258,7 @@ final class GmailPollStrategy implements TriggerStrategy
             createdAt: $trigger->createdAt,
             updatedAt: new DateTimeImmutable,
             pollCursor: $cursor,
-            nextPollAt: $now->modify('+'.$interval.' minutes'),
+            nextPollAt: $now->modify('+' . $interval . ' minutes'),
         );
 
         $this->workflows->saveTrigger($updated);

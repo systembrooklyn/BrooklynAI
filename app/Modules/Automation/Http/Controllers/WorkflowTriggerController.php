@@ -9,7 +9,9 @@ use App\Modules\Automation\Application\DTOs\UpsertWorkflowTriggerInput;
 use App\Modules\Automation\Application\DTOs\WorkflowIdInput;
 use App\Modules\Automation\Core\Exceptions\TemplateSyntaxException;
 use App\Modules\Automation\Core\Exceptions\TriggerNotFoundException;
+use App\Modules\Automation\Core\Exceptions\WorkflowCapabilityException;
 use App\Modules\Automation\Core\Exceptions\WorkflowNotFoundException;
+use App\Modules\Automation\Http\Controllers\Concerns\TranslatesCapabilityErrors;
 use App\Modules\Automation\Http\Requests\UpsertWorkflowTriggerRequest;
 use App\Modules\Connections\Core\Exceptions\ConnectionNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +19,8 @@ use Illuminate\Http\Request;
 
 class WorkflowTriggerController extends Controller
 {
+    use TranslatesCapabilityErrors;
+
     public function upsert(
         UpsertWorkflowTriggerRequest $request,
         int $id,
@@ -40,6 +44,8 @@ class WorkflowTriggerController extends Controller
             return $this->notFound();
         } catch (ConnectionNotFoundException) {
             return $this->connectionNotFound();
+        } catch (WorkflowCapabilityException $e) {
+            return $this->capabilityError($e);
         } catch (TemplateSyntaxException $e) {
             return $this->templateError($e);
         }

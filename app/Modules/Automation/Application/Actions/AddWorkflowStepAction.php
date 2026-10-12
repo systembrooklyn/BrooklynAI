@@ -4,6 +4,7 @@ namespace App\Modules\Automation\Application\Actions;
 
 use App\Modules\Automation\Application\DTOs\AddWorkflowStepInput;
 use App\Modules\Automation\Application\DTOs\StepData;
+use App\Modules\Automation\Application\Services\WorkflowTriggerActionCompatibilityValidator;
 use App\Modules\Automation\Core\Contracts\TemplateResolver;
 use App\Modules\Automation\Core\Entities\WorkflowStep;
 use App\Modules\Automation\Core\Exceptions\WorkflowNotFoundException;
@@ -21,6 +22,7 @@ final class AddWorkflowStepAction
         private readonly ConnectionRepository $connections,
         private readonly IntegrationCatalog $catalog,
         private readonly TemplateResolver $templates,
+        private readonly WorkflowTriggerActionCompatibilityValidator $compatibility,
     ) {}
 
     public function execute(AddWorkflowStepInput $input): StepData
@@ -48,6 +50,21 @@ final class AddWorkflowStepAction
 
         if (! $actionExists) {
             throw new InvalidArgumentException('Unknown action for this integration.');
+        }
+
+        // Trigger/action compatibility: enforced only when a trigger already
+        // exists. A restricted action may be added before its trigger and
+        // will be re-validated when the trigger is upserted or activated.
+        $existingTrigger = $this->workflows->findTriggerForWorkflow($input->workflowId);
+
+        if ($existingTrigger !== null) {
+            $this->compatibility->validate(
+                location: 'step',
+                actionIntegrationKey: $input->integrationKey,
+                actionKey: $input->actionKey,
+                triggerIntegrationKey: $existingTrigger->integrationKey,
+                triggerKey: $existingTrigger->triggerKey,
+            );
         }
 
         if ($input->connectionId !== null) {

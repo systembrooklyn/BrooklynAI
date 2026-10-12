@@ -28,7 +28,7 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 // Google Auth Routes (some public, some protected)
 Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
-Route::get('/auth/google/redirect-google', [GoogleAuthController::class, 'redirectgoogle']);
+// Route::get('/auth/google/redirect-google', [GoogleAuthController::class, 'redirectgoogle']);
 Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
 // Protected routes (require authentication)
 Route::middleware('auth:sanctum')->group(function () {

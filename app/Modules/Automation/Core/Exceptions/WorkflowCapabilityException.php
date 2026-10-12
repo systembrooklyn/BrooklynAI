@@ -20,6 +20,8 @@ final class WorkflowCapabilityException extends RuntimeException
 
     public const ERROR_UNKNOWN_ACTION = 'unknown_action';
 
+    public const ERROR_INCOMPATIBLE_TRIGGER = 'incompatible_trigger';
+
     /**
      * @param  array<string, mixed>  $context
      */
@@ -132,6 +134,35 @@ final class WorkflowCapabilityException extends RuntimeException
                 $location,
                 $actionKey,
                 $integrationKey,
+            ),
+        );
+    }
+
+    /**
+     * The action being validated declares an allowedTriggerKeys restriction
+     * that the current trigger does not satisfy.
+     *
+     * @param  array<int, string>  $allowedTriggerKeys
+     */
+    public static function incompatibleTrigger(
+        string $location,
+        string $actionKey,
+        ?string $triggerKey,
+        array $allowedTriggerKeys,
+    ): self {
+        return new self(
+            self::ERROR_INCOMPATIBLE_TRIGGER,
+            [
+                'location' => $location,
+                'action_key' => $actionKey,
+                'trigger_key' => $triggerKey,
+                'allowed_trigger_keys' => array_values($allowedTriggerKeys),
+            ],
+            sprintf(
+                '%s action "%s" is not compatible with trigger "%s".',
+                $location,
+                $actionKey,
+                $triggerKey ?? '(none)',
             ),
         );
     }

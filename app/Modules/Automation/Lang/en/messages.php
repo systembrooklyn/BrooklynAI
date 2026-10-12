@@ -28,5 +28,6 @@ return [
     'capability_unknown_integration' => 'The workflow references an integration that is not supported.',
     'capability_unknown_trigger' => 'The workflow references a trigger that is not supported.',
     'capability_unknown_action' => 'The workflow references an action that is not supported.',
+    'capability_incompatible_trigger' => 'The selected action is not compatible with this workflow trigger.',
     'capability_validation_failed' => 'The workflow capability validation failed.',
 ];

@@ -28,5 +28,6 @@ return [
     'capability_unknown_integration' => 'سير العمل يشير إلى تكامل غير مدعوم.',
     'capability_unknown_trigger' => 'سير العمل يشير إلى مشغل غير مدعوم.',
     'capability_unknown_action' => 'سير العمل يشير إلى إجراء غير مدعوم.',
+    'capability_incompatible_trigger' => 'الإجراء المحدد غير متوافق مع مشغل سير العمل هذا.',
     'capability_validation_failed' => 'فشل التحقق من قدرات سير العمل.',
 ];

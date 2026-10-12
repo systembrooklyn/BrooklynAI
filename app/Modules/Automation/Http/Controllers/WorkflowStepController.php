@@ -10,8 +10,10 @@ use App\Modules\Automation\Application\DTOs\AddWorkflowStepInput;
 use App\Modules\Automation\Application\DTOs\UpdateWorkflowStepInput;
 use App\Modules\Automation\Application\DTOs\WorkflowStepPositionInput;
 use App\Modules\Automation\Core\Exceptions\TemplateSyntaxException;
+use App\Modules\Automation\Core\Exceptions\WorkflowCapabilityException;
 use App\Modules\Automation\Core\Exceptions\WorkflowNotFoundException;
 use App\Modules\Automation\Core\Exceptions\WorkflowStepNotFoundException;
+use App\Modules\Automation\Http\Controllers\Concerns\TranslatesCapabilityErrors;
 use App\Modules\Automation\Http\Requests\AddWorkflowStepRequest;
 use App\Modules\Automation\Http\Requests\UpdateWorkflowStepRequest;
 use App\Modules\Connections\Core\Exceptions\ConnectionNotFoundException;
@@ -19,6 +21,8 @@ use Illuminate\Http\JsonResponse;
 
 class WorkflowStepController extends Controller
 {
+    use TranslatesCapabilityErrors;
+
     public function store(
         AddWorkflowStepRequest $request,
         int $id,
@@ -39,6 +43,8 @@ class WorkflowStepController extends Controller
             return $this->workflowNotFound();
         } catch (ConnectionNotFoundException) {
             return $this->connectionNotFound();
+        } catch (WorkflowCapabilityException $e) {
+            return $this->capabilityError($e);
         } catch (TemplateSyntaxException $e) {
             return $this->templateError($e);
         }
@@ -73,6 +79,8 @@ class WorkflowStepController extends Controller
             return $this->stepNotFound();
         } catch (ConnectionNotFoundException) {
             return $this->connectionNotFound();
+        } catch (WorkflowCapabilityException $e) {
+            return $this->capabilityError($e);
         } catch (TemplateSyntaxException $e) {
             return $this->templateError($e);
         }

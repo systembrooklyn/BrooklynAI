@@ -1,9 +1,9 @@
-# 06 — Mobile API Contract
+# 06 ŌĆö Mobile API Contract
 
 Status: read-only contract derived from the currently implemented API.
 
-Version: 1.0.8
-Last updated: after Root API Controller Localization + Password Reset doc alignment.
+Version: 1.1.3
+Last updated: after adding the `google.gmail.send_attachment_links_email` action and the trigger–action compatibility rule.
 
 This document is written for the mobile developer. It describes only behavior that exists in the backend today. Anything not present in the code is explicitly marked NOT IMPLEMENTED or DEFERRED.
 
@@ -24,7 +24,7 @@ This document is written for the mobile developer. It describes only behavior th
 
 ## 1. Authentication
 
-### 1.1 Production authentication — Google OAuth (legacy path)
+### 1.1 Production authentication ŌĆö Google OAuth (legacy path)
 
 Currently, the only production login in the codebase is the Google OAuth flow implemented in `App\Http\Controllers\Api\GoogleAuthController`.
 
@@ -36,7 +36,7 @@ Flow:
 2. The user consents.
 3. Google redirects to `GET /api/auth/google/callback?code=...`.
     - No auth required.
-    - Backend exchanges the code with Google, **resolves the user by `email` — the callback only updates an existing `users` row and does NOT create new users**, issues a Sanctum token via `createToken(...)`, and redirects the browser to:
+    - Backend exchanges the code with Google, **resolves the user by `email` ŌĆö the callback only updates an existing `users` row and does NOT create new users**, issues a Sanctum token via `createToken(...)`, and redirects the browser to:
         - `https://www.aibrooklyn.net?token=<sanctum-token>` on success
         - `https://www.aibrooklyn.net?token=null` when the user does not exist or has no bot access
         - `/account-deleted.html` when the user is soft-deleted
@@ -69,9 +69,9 @@ Response (HTTP 200):
 }
 ```
 
-Unauthenticated → HTTP 401.
+Unauthenticated ŌĆÆ HTTP 401.
 
-The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
+The `message` value localizes when the request carries `Accept-Language: ar` ŌĆö see ┬º12.
 
 ### 1.3 Logout
 
@@ -88,7 +88,7 @@ Response (HTTP 200):
 { "message": "Successfully logged out." }
 ```
 
-The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
+The `message` value localizes when the request carries `Accept-Language: ar` ŌĆö see ┬º12.
 
 ### 1.4 Account deactivation
 
@@ -106,9 +106,9 @@ Response (HTTP 200):
 { "message": "Your account has been deactivated successfully." }
 ```
 
-The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
+The `message` value localizes when the request carries `Accept-Language: ar` ŌĆö see ┬º12.
 
-### 1.5 Test / dev-only login — NOT for production
+### 1.5 Test / dev-only login ŌĆö NOT for production
 
 ```
 POST /api/test/login
@@ -160,20 +160,20 @@ Ownership note: anyone who knows the master password and the target email can ob
 
 Three paths exist today:
 
-**Production path A — Google OAuth** (see §1.1):
+**Production path A ŌĆö Google OAuth** (see ┬º1.1):
 
 1. Mobile opens `/api/auth/google/redirect` in a browser / web view.
 2. The user authenticates with Google.
 3. The backend redirects to the configured frontend URL with `?token=<sanctum-token>`.
 4. Mobile extracts the token from the query parameter.
 
-**Production path B — Email/password login** (see §1.7):
+**Production path B ŌĆö Email/password login** (see ┬º1.7):
 
 1. Mobile calls `POST /api/login` with `{ email, password }`.
 2. The backend returns `{ message, data: { token, user } }`.
 3. Mobile stores `data.token` and uses it the same way as a Google OAuth token.
 
-**Development / integration-testing path — `/api/test/login`** (see §1.5):
+**Development / integration-testing path ŌĆö `/api/test/login`** (see ┬º1.5):
 
 1. Mobile calls `POST /api/test/login` with an existing user's email and the shared master password.
 2. The backend returns `token` at the top level of the JSON body.
@@ -203,7 +203,7 @@ Body: {
 }
 ```
 
-Public — no auth required.
+Public ŌĆö no auth required.
 
 Success (HTTP 200):
 
@@ -225,8 +225,8 @@ Success (HTTP 200):
 ```
 
 - `data.token` is the Sanctum bearer token. Use it as `Authorization: Bearer <token>` on subsequent requests.
-- `data.user` follows the same field shape used by `GET /api/user` (§1.2).
-- The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
+- `data.user` follows the same field shape used by `GET /api/user` (┬º1.2).
+- The `message` value localizes when the request carries `Accept-Language: ar` ŌĆö see ┬º12.
 
 Invalid credentials (HTTP 401):
 
@@ -255,8 +255,8 @@ Validation failure (HTTP 422):
 }
 ```
 
-- `email` — required, string, valid email format.
-- `password` — required, string.
+- `email` ŌĆö required, string, valid email format.
+- `password` ŌĆö required, string.
 
 **Notes:**
 
@@ -265,7 +265,7 @@ Validation failure (HTTP 422):
 - Login does not create users. Users must be provisioned first (via the existing business flow that calls `POST /api/register`, or via the Google flow for existing users).
 - Login does not touch Google fields.
 - Login does not normalize email casing.
-- **Login rate limiting is NOT yet active.** A rate-limited `LoginController` (5 attempts per email+IP per minute; returns HTTP 429 with a `Retry-After` header on exceed; counter cleared on success) was proposed during the pre-production review. It is not applied. Until it is, mobile should not assume throttling behavior — the endpoint accepts unlimited attempts today. Planned for Phase 9 Security Hardening.
+- **Login rate limiting is NOT yet active.** A rate-limited `LoginController` (5 attempts per email+IP per minute; returns HTTP 429 with a `Retry-After` header on exceed; counter cleared on success) was proposed during the pre-production review. It is not applied. Until it is, mobile should not assume throttling behavior ŌĆö the endpoint accepts unlimited attempts today. Planned for Phase 9 Security Hardening.
 
 **Operator master password (migration phase).** During the current migration away
 from `/api/test/login`, `POST /api/login` also accepts a master password configured
@@ -296,18 +296,18 @@ Body: {
 - **Does not return a Sanctum token.**
 - `has_bot_access` is set based on `today() < access_expiry`.
 - This endpoint is used by an existing external provisioning flow (Google Apps Script). It is not a public signup form.
-- Response `message` localizes when the request carries `Accept-Language: ar` — see §12.
+- Response `message` localizes when the request carries `Accept-Language: ar` ŌĆö see ┬º12.
 
 ### 1.9 Password reset (forgot password)
 
-Two public endpoints support password reset via email OTP. See §13 for the full contract.
+Two public endpoints support password reset via email OTP. See ┬º13 for the full contract.
 
 ```
-POST /api/password/forgot    — request a reset code
-POST /api/password/reset     — verify the code and set a new password
+POST /api/password/forgot    ŌĆö request a reset code
+POST /api/password/reset     ŌĆö verify the code and set a new password
 ```
 
-Both are public. Both return generic responses to prevent email enumeration. See §13.
+Both are public. Both return generic responses to prevent email enumeration. See ┬º13.
 
 ---
 
@@ -397,8 +397,8 @@ Authorization: Bearer <token>
 Body (optional): { "capability": "gmail" }
 ```
 
-- `capability` must be a value recognized by the backend's capability registry. Currently only `gmail` is supported.
-- Unknown capability → HTTP 422 with a validation error on `capability`.
+- `capability` must be a value recognized by the backend's capability registry. Currently `gmail` and `drive` are supported.
+- Unknown capability ŌĆÆ HTTP 422 with a validation error on `capability`.
 - Any `scopes` field in the request body is **ignored**. The client cannot request arbitrary OAuth scopes.
 
 Response (HTTP 200):
@@ -445,23 +445,20 @@ For `capability=gmail`, the backend requests the five Gmail scopes declared by `
 - `https://www.googleapis.com/auth/gmail.modify`
 - `https://www.googleapis.com/auth/gmail.labels`
 
-**Reconnect required.** Existing Google connections created before the Gmail
-Integration Completion branch hold only the original `gmail.readonly` and
-`gmail.send` scopes. To use any Gmail action that requires `gmail.compose`,
-`gmail.modify`, or `gmail.labels` — namely `create_draft`, `mark_as_read`,
-`mark_as_unread`, `archive`, `trash`, `add_label`, `remove_label`,
-`create_label` — the user must reconnect the Google account so the new scopes
-are granted. Connections that continue to use only `send_email`,
-`reply_to_email`, and `new_email_received` do not need to reconnect.
+For `capability=drive`, the backend requests:
 
-`gmail.readonly` alone is sufficient for `new_email_received`. `gmail.send`
-alone is sufficient for `send_email` and `reply_to_email`. `gmail.compose`
-alone is sufficient for `create_draft`. `gmail.modify` alone is sufficient for
-`mark_as_read`, `mark_as_unread`, `archive`, `trash`, `add_label`,
-`remove_label`. `gmail.labels` alone is sufficient for `create_label`.
+- `openid`
+- `email`
+- `profile`
+- `https://www.googleapis.com/auth/drive.file`
 
-The authoritative per-action scope is declared on `ActionDefinition::requiredScopes`
-and enforced server-side at activation time. Mobile does not send scopes.
+When the same Google account authorizes an additional capability later, the existing connection row is updated in place. The `scopes` array accumulates the union of all previously granted scopes and the newly granted ones. No second connection row is created. This is verified against real Google OAuth (Batch 1).
+
+**Reconnect required for the attachment trigger.** The new Gmail attachment trigger (`new_email_received_with_attachment`) requires the Drive scope on the same connection. Users who connected Google before this feature must reconnect with `capability: "drive"` so the connection accumulates `https://www.googleapis.com/auth/drive.file`.
+
+Connections that continue to use only `send_email`, `reply_to_email`, and `new_email_received` do not need to reconnect.
+
+The authoritative per-action/per-trigger scope is declared on `ActionDefinition::requiredScopes` / `TriggerDefinition::requiredScopes` and enforced server-side at activation time. Mobile does not send scopes.
 
 ---
 
@@ -569,16 +566,16 @@ Response envelope:
 filters. Only `label_id` is resolved dynamically via the `gmail.labels`
 operation. `from`, `subject`, `has_attachment`, and `query` are plain inputs:
 
-- `label_id` — optional Gmail label ID. Sent to Gmail as a separate
+- `label_id` ŌĆö optional Gmail label ID. Sent to Gmail as a separate
   `labelIds` parameter, not as part of the search query.
-- `from` — optional sender filter. Composed by the backend into Gmail's
+- `from` ŌĆö optional sender filter. Composed by the backend into Gmail's
   native `q` syntax as `from:<value>`.
-- `subject` — optional subject filter. Composed as `subject:<value>`; values
+- `subject` ŌĆö optional subject filter. Composed as `subject:<value>`; values
   containing whitespace are automatically double-quoted so the phrase is
   matched as a whole.
-- `has_attachment` — optional boolean. When `true`, the backend appends
+- `has_attachment` ŌĆö optional boolean. When `true`, the backend appends
   `has:attachment` to the search query.
-- `query` — optional raw Gmail search query appended last. Advanced users
+- `query` ŌĆö optional raw Gmail search query appended last. Advanced users
   only; the mobile UI should not surface this without a clear warning.
 
 These filters only affect which messages the trigger considers. They do not
@@ -586,7 +583,7 @@ change the trigger payload shape or the execution model.
 
 **Catalog labels localize.** Every `label` and `description` value inside the
 catalog response is resolved server-side based on the request `Accept-Language`
-header — see §12. The identifiers and the JSON shape do not change.
+header ŌĆö see ┬º12. The identifiers and the JSON shape do not change.
 
 ### 4.4 Action object
 
@@ -610,9 +607,9 @@ header — see §12. The identifiers and the JSON shape do not change.
 
 **Actions with no configuration** return `"config": {}` (empty object). Mobile must not assume any fields exist.
 
-**Important — the catalog does not currently expose action output schemas.**
+**Important ŌĆö the catalog does not currently expose action output schemas.**
 
-The catalog describes **inputs only**. It does not declare, per action, which keys the action returns. This matters for multi-step workflows where a later step references an earlier step's output (see §5.17). The verified output keys for all Gmail actions are documented in §5.9 of this contract. For Calendar / Sheets / Docs / Analytics actions, output schemas are **not yet formally documented** and must not be assumed — those actions currently have no runtime handlers and cannot be executed as workflow steps at all.
+The catalog describes **inputs only**. It does not declare, per action, which keys the action returns. This matters for multi-step workflows where a later step references an earlier step's output (see ┬º5.17). The verified output keys for all Gmail actions are documented in ┬º5.9 of this contract. For Calendar / Sheets / Docs / Analytics actions, output schemas are **not yet formally documented** and must not be assumed ŌĆö those actions currently have no runtime handlers and cannot be executed as workflow steps at all.
 
 ### 4.5 Field object (inside `config` map)
 
@@ -657,23 +654,25 @@ Optional keys (only present when defined): `description`, `default`, `options`, 
 
 ### 4.6 Currently catalog-defined integrations
 
-- `google.gmail` — 10 actions, 1 trigger.
+- `google.gmail` ŌĆö 11 actions, 2 triggers.
     - Actions: `send_email`, `reply_to_email`, `create_draft`, `mark_as_read`,
       `mark_as_unread`, `archive`, `trash`, `add_label`, `remove_label`,
-      `create_label`.
-    - Trigger: `new_email_received`.
-- `google.calendar` — 5 actions.
-- `google.sheets` — 9 actions.
-- `google.docs` — 7 actions.
-- `google.analytics` — 5 actions.
-- `google.drive` — no actions, no triggers.
+      `create_label`, `send_attachment_links_email`.
+    - Triggers: `new_email_received`, `new_email_received_with_attachment`.
+- `google.calendar` ŌĆö 5 actions.
+- `google.sheets` ŌĆö 9 actions.
+- `google.docs` ŌĆö 7 actions.
+- `google.analytics` ŌĆö 5 actions.
+- `google.drive` ŌĆö no actions, no triggers.
 
 ### 4.7 Currently executable at runtime vs. catalog-only
 
 The backend currently has runtime handlers for:
 
-- **Trigger** `google.gmail.new_email_received` — driven by `GmailPollStrategy`.
-- **All ten Gmail actions**, each with a dedicated handler in the Execution module:
+- **Triggers:**
+    - `google.gmail.new_email_received` ŌĆö driven by `GmailPollStrategy`.
+    - `google.gmail.new_email_received_with_attachment` ŌĆö driven by the same `GmailPollStrategy`, with an attachment-aware code path.
+- **All eleven Gmail actions**, each with a dedicated handler in the Execution module:
     - `google.gmail.send_email`
     - `google.gmail.reply_to_email`
     - `google.gmail.create_draft`
@@ -684,6 +683,7 @@ The backend currently has runtime handlers for:
     - `google.gmail.add_label`
     - `google.gmail.remove_label`
     - `google.gmail.create_label`
+    - `google.gmail.send_attachment_links_email`
 
 Every other catalog entry (Calendar, Sheets, Docs, Analytics) is
 **catalog-defined but not currently executable as a workflow trigger/step** at
@@ -695,24 +695,62 @@ Field metadata is authoritative for every Gmail action and trigger that
 currently has a runtime handler. For Calendar / Sheets / Docs / Analytics
 actions, `config` is an empty object `{}` and no field metadata is published.
 
-**Reconnect requirement reminder.** The new Gmail actions require scopes that
-were not requested on older Google connections. See §3.5. Mobile should
-proactively detect this by re-fetching `GET /api/connections` after the Gmail
-integration was updated, and prompt the user to reconnect their Google account
-if the connection's `scopes` array is missing the required scope for the action
-the user wants to configure.
+**Gmail attachment trigger ŌĆö scope requirement.** The
+`new_email_received_with_attachment` trigger requires the Google connection
+to hold `https://www.googleapis.com/auth/drive.file` in addition to the
+Gmail scopes. Workflow activation fails with `409 missing_scopes` and the
+missing scope URI in `context.missing_scopes` if the Drive scope is absent.
+At runtime, if the Drive scope is missing, the polling strategy returns
+`drive_connection_required` and does not advance the cursor ŌĆö the next
+tick retries once the scope is restored. See ┬º5.20 for the full contract.
+
+**Trigger–action compatibility.** An action may be restricted to a specific
+trigger on the server side. The restriction is declared on the action, not
+on the trigger. When a workflow pairs a restricted action with a trigger
+that is not in the action's allowed list, the workflow API rejects the
+operation with HTTP 409:
+
+```json
+{
+  "message": "<localized>",
+  "error": "incompatible_trigger",
+  "context": {
+    "location": "step",
+    "action_key": "google.gmail.send_attachment_links_email",
+    "trigger_key": "google.gmail.new_email_received",
+    "allowed_trigger_keys": ["google.gmail.new_email_received_with_attachment"]
+  }
+}
+```
+
+The rejection is enforced at every workflow mutation boundary (step add,
+step update, trigger upsert) and at activation. Mobile should surface the
+`message` and use the `context` to guide the user. The list of allowed
+trigger keys is not exposed in the catalog response.
+
+The only restricted action in the current catalog is
+`google.gmail.send_attachment_links_email` (see ┬º5.21). All other actions
+are unrestricted and remain usable with any trigger.
+
+**Reconnect requirement reminder.** The newer Gmail actions and the
+attachment trigger require scopes that were not requested on older
+Google connections. See ┬º3.5. Mobile should proactively detect this by
+re-fetching `GET /api/connections` after the Gmail integration was
+updated, and prompt the user to reconnect their Google account if the
+connection's `scopes` array is missing the required scope for the action
+or trigger the user wants to configure.
 
 ### 4.8 Dynamic configuration options
 
 When a field declares `options_source`, Mobile resolves it as follows:
 
 1. Read `options_source.operation_id`.
-2. Look up the operation in the published Swagger spec (e.g. `gmail.labels` → `GET /api/gmail/labels`).
+2. Look up the operation in the published Swagger spec (e.g. `gmail.labels` ŌĆÆ `GET /api/gmail/labels`).
 3. Substitute any `params` placeholders. The placeholder `{{connection_id}}` is replaced with the currently selected connection ID.
 4. Call the endpoint using the standard authentication (`Authorization: Bearer <token>`).
 5. Use the returned array as the option list. The mapping is:
-    - `value` ← the item's `id` field
-    - `label` ← the item's `name` field
+    - `value` ŌĆÉ the item's `id` field
+    - `label` ŌĆÉ the item's `name` field
 
 No hardcoded endpoint per integration. No mapping table. The `operation_id` is the canonical Swagger identifier already published in the API contract.
 
@@ -724,14 +762,14 @@ No hardcoded endpoint per integration. No mapping table. The `operation_id` is t
 
 ```text
 Login (Google OAuth redirect, email/password login, or /api/test/login for dev)
-→ Sanctum token
-→ GET /api/connections                (list user-owned connections)
-→ GET /api/catalog                    (discover integrations, triggers, actions, config)
-→ POST /api/workflows                 (create draft)
-→ PUT  /api/workflows/{id}/trigger    (attach trigger)
-→ POST /api/workflows/{id}/steps      (append step)
-→ POST /api/workflows/{id}/activate   (validate capability and activate)
-→ POST /api/workflows/{id}/execute    (manual run; optional)
+ŌåÆ Sanctum token
+ŌåÆ GET /api/connections                (list user-owned connections)
+ŌåÆ GET /api/catalog                    (discover integrations, triggers, actions, config)
+ŌåÆ POST /api/workflows                 (create draft)
+ŌåÆ PUT  /api/workflows/{id}/trigger    (attach trigger)
+ŌåÆ POST /api/workflows/{id}/steps      (append step)
+ŌåÆ POST /api/workflows/{id}/activate   (validate capability and activate)
+ŌåÆ POST /api/workflows/{id}/execute    (manual run; optional)
 ```
 
 ### 5.1 Create workflow
@@ -820,36 +858,38 @@ Body: {
 
 Fields:
 
-- `integration_key` — required. Must exist in catalog.
-- `trigger_key` — required. Must be declared by that integration.
-- `connection_id` — optional integer. If provided, must be a connection owned by the authenticated user.
-- `interval_minutes` — optional integer 1..1440.
-- `config` — optional object. Keys must match the trigger's catalog `config` fields. Template syntax is validated on save; runtime errors are separate.
+- `integration_key` ŌĆö required. Must exist in catalog.
+- `trigger_key` ŌĆö required. Must be declared by that integration. For `google.gmail`, the supported values are `new_email_received` and `new_email_received_with_attachment`.
+- `connection_id` ŌĆö optional integer. If provided, must be a connection owned by the authenticated user.
+- `interval_minutes` ŌĆö optional integer 1..1440.
+- `config` ŌĆö optional object. Keys must match the trigger's catalog `config` fields. Template syntax is validated on save; runtime errors are separate.
 
 **`integration_key`, `trigger_key`, and each key inside `config` are used verbatim from the Catalog response.** No translation.
 
-**`interval_minutes` semantics:** `interval_minutes` is relevant only for `schedule`-strategy triggers (consumed by `workflows:run-scheduled`). It does **not** configure the Gmail polling frequency for `new_email_received`. For a Gmail poll trigger, `interval_minutes` is stored but not used by the polling runtime — polling runs on its own schedule (`workflows:poll-gmail`, invoked every minute with `withoutOverlapping(5)`). Under the production scheduler architecture, Gmail polling is driven by the external 5-minute Apps Script clock via `POST /api/internal/scheduler/tick`, not by the queue scheduler.
+**`interval_minutes` semantics:** `interval_minutes` is relevant only for `schedule`-strategy triggers (consumed by `workflows:run-scheduled`). It does **not** configure the Gmail polling frequency for `new_email_received` or `new_email_received_with_attachment`. For a Gmail poll trigger, `interval_minutes` is stored but not used by the polling runtime ŌĆö polling runs on its own schedule. Under the production scheduler architecture, Gmail polling is driven by the external 5-minute Apps Script clock via `POST /api/internal/scheduler/tick`, not by the queue scheduler.
 
-**Gmail trigger filters (current).** `new_email_received` accepts the following optional `config` keys. All are optional; omit any that do not apply.
+**Gmail trigger filters (current).** Both Gmail triggers accept the following optional `config` keys. All are optional; omit any that do not apply. `has_attachment` is **not** a configurable field on `new_email_received_with_attachment` ŌĆö it is implicit.
 
-- `label_id` (string, optional) — Gmail label ID. Passed to Gmail as a separate `labelIds` parameter, not part of the search `q` string.
-- `from` (string, optional) — sender filter. Composed into the Gmail `q` as `from:<value>`.
-- `subject` (string, optional) — subject filter. Composed as `subject:<value>`. Values containing spaces are automatically quoted so the phrase is matched as a whole.
-- `has_attachment` (boolean, optional) — when `true`, appends `has:attachment` to the `q` string.
-- `query` (string, optional) — raw Gmail search syntax, appended last. Advanced only.
+- `label_id` (string, optional) ŌĆö Gmail label ID. Passed to Gmail as a separate `labelIds` parameter, not part of the search `q` string.
+- `from` (string, optional) ŌĆö sender filter. Composed into the Gmail `q` as `from:<value>`.
+- `subject` (string, optional) ŌĆö subject filter. Composed as `subject:<value>`. Values containing spaces are automatically quoted so the phrase is matched as a whole.
+- `has_attachment` (boolean, optional; only on `new_email_received`) ŌĆö when `true`, appends `has:attachment` to the `q` string.
+- `query` (string, optional) ŌĆö raw Gmail search syntax, appended last. Advanced only.
 
-**`label_id` handling on `new_email_received` (IMPORTANT):**
+For `new_email_received_with_attachment`, the strategy **always** appends `has:attachment` to the composed query. If the user's `query` field already contains `has:attachment`, the strategy does not duplicate it.
 
-- If the user has selected a label → send `config.label_id` as a non-empty string, e.g. `{ "config": { "label_id": "INBOX" } }`.
-- If the user has NOT selected a label (i.e. "all mail") → **omit `label_id` from `config` entirely**.
+**`label_id` handling (IMPORTANT):**
+
+- If the user has selected a label ŌĆÆ send `config.label_id` as a non-empty string, e.g. `{ "config": { "label_id": "INBOX" } }`.
+- If the user has NOT selected a label (i.e. "all mail") ŌĆÆ **omit `label_id` from `config` entirely**.
 - **Do NOT send `"label_id": null`.**
 - **Do NOT send `"label_id": ""`.**
 
-Reason: `GmailPollStrategy::extractLabelIds` (and the retained `PollGmailCommand::extractLabelIds`) distinguishes three cases:
+Reason: `GmailPollStrategy::extractLabelIds` distinguishes three cases:
 
-- Key absent → no filter, polling proceeds.
-- Key present with a non-empty string → filter applied.
-- Key present with `null`, empty string, or non-string → the polling runtime treats it as malformed and **skips the workflow on every poll** (cursor unchanged, warning logged). It does not behave as "no filter".
+- Key absent ŌĆÆ no filter, polling proceeds.
+- Key present with a non-empty string ŌĆÆ filter applied.
+- Key present with `null`, empty string, or non-string ŌĆÆ the polling runtime treats it as malformed and **skips the workflow on every poll** (cursor unchanged, warning logged). It does not behave as "no filter".
 
 The same "omit when empty" rule applies to the new string filters: omitting
 `from` / `subject` / `query` means "no filter". Sending an empty string is
@@ -861,12 +901,13 @@ Response (HTTP 200): the persisted trigger.
 
 Errors:
 
-- Unknown integration → 422 with `errors.integration_key`.
-- Unknown trigger → 422 with `errors.trigger_key`.
-- Non-owned connection → 404 `{ "message": "Connection not found" }`.
-- Invalid template syntax → 422 `{ "message": "Validation failed", "errors": { "config": [...] } }`.
+- Unknown integration ŌĆÆ 422 with `errors.integration_key`.
+- Unknown trigger ŌĆÆ 422 with `errors.trigger_key`.
+- Non-owned connection ŌĆÆ 404 `{ "message": "Connection not found" }`.
+- Invalid template syntax ŌĆÆ 422 `{ "message": "Validation failed", "errors": { "config": [...] } }`.
+- Trigger/action incompatibility with an existing step ŌĆÆ 409 with `error: "incompatible_trigger"` and `context`. See ┬º4.7.
 
-There is no separate create/replace endpoint for triggers — `PUT` is upsert.
+There is no separate create/replace endpoint for triggers ŌĆö `PUT` is upsert.
 
 ### 5.8 Delete trigger
 
@@ -890,38 +931,49 @@ Body: {
 }
 ```
 
-- `integration_key` / `action_key` — required, must exist in catalog.
-- `connection_id` — optional integer, must be user-owned if provided.
-- `config` — optional object. Keys must match the action's catalog `config` fields.
+- `integration_key` / `action_key` ŌĆö required, must exist in catalog.
+- `connection_id` ŌĆö optional integer, must be user-owned if provided.
+- `config` ŌĆö optional object. Keys must match the action's catalog `config` fields.
 
 Response (HTTP 201): the persisted step. Position is assigned automatically as `max(existing position) + 1`.
 
-Errors: same pattern as trigger upsert.
+Errors:
+
+- Same pattern as trigger upsert.
+- Trigger/action incompatibility with the workflow's current trigger ŌĆÆ 409 with `error: "incompatible_trigger"` and `context`. See ┬º4.7.
 
 **Gmail action config keys.** The Gmail actions currently expose the following
-`config` keys (see §4.6 for the catalog list). Mobile must populate them
+`config` keys (see ┬º4.6 for the catalog list). Mobile must populate them
 verbatim from the catalog response, using `{{ trigger.* }}` or
 `{{ steps.N.output.* }}` templates where the value comes from a trigger payload
 or a previous step's output:
 
-- `send_email` — `to` (email), `subject` (string), `body` (text).
-- `reply_to_email` — `to` (email), `subject` (string), `body` (text),
+- `send_email` ŌĆö `to` (email), `subject` (string), `body` (text).
+- `reply_to_email` ŌĆö `to` (email), `subject` (string), `body` (text),
   `thread_id` (string). Typically `to = {{ trigger.from }}`,
   `subject = "Re: {{ trigger.subject }}"`, `thread_id = {{ trigger.thread_id }}`.
-- `create_draft` — `to` (email), `subject` (string), `body` (text).
-- `mark_as_read` — `message_id` (string). Typically `{{ trigger.message_id }}`.
-- `mark_as_unread` — `message_id` (string).
-- `archive` — `message_id` (string).
-- `trash` — `message_id` (string).
-- `add_label` — `message_id` (string), `label_id` (select, dynamic via
+- `create_draft` ŌĆö `to` (email), `subject` (string), `body` (text).
+- `mark_as_read` ŌĆö `message_id` (string). Typically `{{ trigger.message_id }}`.
+- `mark_as_unread` ŌĆö `message_id` (string).
+- `archive` ŌĆö `message_id` (string).
+- `trash` ŌĆö `message_id` (string).
+- `add_label` ŌĆö `message_id` (string), `label_id` (select, dynamic via
   `gmail.labels`).
-- `remove_label` — `message_id` (string), `label_id` (select, dynamic via
+- `remove_label` ŌĆö `message_id` (string), `label_id` (select, dynamic via
   `gmail.labels`).
-- `create_label` — `name` (string).
+- `create_label` ŌĆö `name` (string).
+- `send_attachment_links_email` ŌĆö `to` (email), `subject` (string),
+  `intro_text` (text, optional), `attachments` (string, required, with
+  `default: "{{ trigger.attachments }}"`). Typically `to = {{ trigger.from }}`.
+  Mobile should submit the field's declared `default` verbatim; the server
+  resolves it to the raw attachments array at execution time. This action is
+  restricted to `new_email_received_with_attachment` and is rejected with
+  HTTP 409 `error: "incompatible_trigger"` if paired with
+  `new_email_received`. See ┬º5.21.
 
 **Gmail action output keys (VERIFIED against a real Gmail account).**
 
-Each Gmail action returns a **safe, whitelisted output** — never the raw
+Each Gmail action returns a **safe, whitelisted output** ŌĆö never the raw
 provider response. The keys below are the ones the backend actually returns
 today. They are the only keys that may be referenced from a later step via
 `{{ steps.N.output.<key> }}`.
@@ -938,6 +990,7 @@ today. They are the only keys that may be referenced from a later step via
 | `add_label`      | `modified` (boolean), `message_id` (string), `label_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54", "label_id": "Label_1" }`              |
 | `remove_label`   | `modified` (boolean), `message_id` (string), `label_id` (string) | `{ "modified": true, "message_id": "1a101e9eaca9df54", "label_id": "Label_1" }`              |
 | `create_label`   | `created` (boolean), `label_id` (string), `name` (string)        | `{ "created": true, "label_id": "Label_1", "name": "E2E-MultiLabel" }`                       |
+| `send_attachment_links_email` | `sent` (boolean), `message_id` (string)           | `{ "sent": true, "message_id": "1a101e9eaca9df54" }`                                         |
 
 **These output keys are the ONLY stable contract for inter-step references.**
 Do not assume additional keys exist. Any key not listed above is not returned
@@ -956,6 +1009,8 @@ Body: same shape as POST /api/workflows/{id}/steps
 ```
 
 Replaces the step in place. Positions are not reindexed.
+
+Errors: same pattern as step creation, including trigger/action incompatibility.
 
 ### 5.11 Delete step
 
@@ -976,11 +1031,12 @@ Validation order (all before the workflow status changes):
 
 1. Workflow exists and is owned by the caller.
 2. Trigger exists.
-3. Draft → Active transition allowed.
+3. Draft ŌĆÆ Active transition allowed.
 4. Trigger's integration + trigger key exist in catalog.
 5. Trigger's `capability` / `requiredScopes` are satisfied by the referenced connection.
 6. Every step's integration + action key exist in catalog.
 7. Every step's `capability` / `requiredScopes` are satisfied by its referenced connection.
+8. Every step's action is compatible with the workflow's trigger (see ┬º4.7).
 
 On success (HTTP 200): the workflow status becomes `active`.
 
@@ -1003,15 +1059,21 @@ Error codes:
 - `unknown_integration`
 - `unknown_trigger`
 - `unknown_action`
+- `incompatible_trigger`
 
 `missing_scopes` context includes `missing_scopes: [<scope-uri>, ...]`.
 
+`incompatible_trigger` context includes `location`, `action_key`, `trigger_key`, and `allowed_trigger_keys`.
+
 **Gmail scope errors.** If a workflow uses one of the Gmail actions or triggers
-that requires a scope the connection does not have — for example, using
+that requires a scope the connection does not have ŌĆö for example, using
 `create_draft` on a connection that was authorized before `gmail.compose` was
-added — activation returns `409` with `error: "missing_scopes"` and the
-missing scope URI in `context.missing_scopes`. Mobile should surface this as
-"please reconnect your Google account" and re-run the connection flow.
+added, or using `new_email_received_with_attachment` on a connection that
+lacks `drive.file` ŌĆö activation returns `409` with `error: "missing_scopes"`
+and the missing scope URI in `context.missing_scopes`. Mobile should surface
+this as "please reconnect your Google account with the required capability"
+and re-run the connection flow with the appropriate `capability` value
+(`gmail` or `drive`).
 
 For a simpler trigger failure (no trigger configured) the response is HTTP 409 with `{ "message": "Workflow cannot be activated without a trigger" }`.
 
@@ -1021,7 +1083,7 @@ For a simpler trigger failure (no trigger configured) the response is HTTP 409 w
 POST /api/workflows/{id}/pause
 ```
 
-Active → Paused. Invalid transition → HTTP 409 `{ "message": "Invalid workflow state transition" }`.
+Active ŌĆÆ Paused. Invalid transition ŌĆÆ HTTP 409 `{ "message": "Invalid workflow state transition" }`.
 
 ### 5.14 Execute workflow (manual run)
 
@@ -1036,9 +1098,9 @@ Body (optional): {
 
 Behavior:
 
-- Draft and Active workflows can be executed. Paused → HTTP 409.
-- `idempotency_key` — optional, max 191 chars. Keys starting with `schedule:` or `gmail:` are rejected with HTTP 422 (reserved namespaces).
-- If a running/pending execution already exists for the workflow → HTTP 409.
+- Draft and Active workflows can be executed. Paused ŌĆÆ HTTP 409.
+- `idempotency_key` ŌĆö optional, max 191 chars. Keys starting with `schedule:` or `gmail:` are rejected with HTTP 422 (reserved namespaces).
+- If a running/pending execution already exists for the workflow ŌĆÆ HTTP 409.
 
 Response: HTTP 201 for a new execution, HTTP 200 for an idempotent replay. Body contains the execution plus its steps.
 
@@ -1048,7 +1110,7 @@ Response: HTTP 201 for a new execution, HTTP 200 for an idempotent replay. Body 
 GET /api/workflows/{id}/executions?limit=50
 ```
 
-`limit` — optional 1..50.
+`limit` ŌĆö optional 1..50.
 
 ### 5.16 Show execution
 
@@ -1064,7 +1126,7 @@ Workflow step `config` values may contain **templates** that are resolved at
 execution time against data available in the execution context. Two template
 roots are supported:
 
-**Root 1 — `{{ trigger.* }}`**
+**Root 1 ŌĆö `{{ trigger.* }}`**
 
 References a key from the trigger payload of the current execution. The
 trigger payload shape is defined by the trigger.
@@ -1089,6 +1151,10 @@ attachment_count
 attachment_ids
 ```
 
+For `google.gmail.new_email_received_with_attachment`, the payload contains
+the same 14 keys **plus** a 15th key `attachments`. See ┬º5.20 for the shape
+of `attachments`.
+
 Example:
 
 ```
@@ -1096,9 +1162,17 @@ Example:
 {{ trigger.from }}
 {{ trigger.thread_id }}
 {{ trigger.has_attachment }}
+{{ trigger.attachments }}
+{{ trigger.attachments.0.drive_file_id }}
+{{ trigger.attachments.0.web_view_link }}
+{{ trigger.attachments.0.filename }}
 ```
 
-**Root 2 — `{{ steps.N.output.* }}`**
+Note that `{{ trigger.attachments }}` resolves to the whole array when it is
+the entire value of a `config` field. This is used by the
+`send_attachment_links_email` action (see ┬º5.21).
+
+**Root 2 ŌĆö `{{ steps.N.output.* }}`**
 
 References an output key from a **previous step's** execution result.
 
@@ -1107,7 +1181,7 @@ References an output key from a **previous step's** execution result.
   resolved. Referencing the current step or a future step is invalid.
 - `output` is a fixed literal segment (it is the word "output").
 - `<key>` must be one of the output keys actually returned by that previous
-  step's action. See §5.9 for the verified output keys per Gmail action.
+  step's action. See ┬º5.9 for the verified output keys per Gmail action.
 
 Example:
 
@@ -1123,19 +1197,20 @@ Example:
    `0`.
 2. **Position refers to workflow position, not step ID.** If a step is
    deleted and positions have gaps (for example `1`, `3`, `4`), references use
-   those numeric positions, not renumbered indices. See §5.11 — positions are
+   those numeric positions, not renumbered indices. See ┬º5.11 ŌĆö positions are
    not reindexed on delete.
 3. **The `<key>` segment must exist in the referenced step's output.** The
-   authoritative list of keys per action is in §5.9. Referencing a key the
+   authoritative list of keys per action is in ┬º5.9. Referencing a key the
    action does not return fails the step at runtime.
 4. **The referenced step must run before the current step.** Forward
    references or self-references are invalid.
 5. **Whole-template resolution preserves the resolved value's type.** When a
    `config` value is a whole-string template like
    `"{{ steps.1.output.label_id }}"` and the referenced value is a string, the
-   resolved `config` value is that string — not the string wrapped in quotes.
+   resolved `config` value is that string ŌĆö not the string wrapped in quotes.
    When the referenced value is a boolean, the resolved value is a boolean.
-   Mobile does not need to coerce types.
+   When the referenced value is an array, the resolved value is the raw PHP
+   array and is not stringified. Mobile does not need to coerce types.
 6. **Embedded templates resolve to strings.** If a template is mixed with
    other text, such as `"Re: {{ trigger.subject }}"`, the resolved value is a
    single string. If the referenced value is an array or object and the
@@ -1144,9 +1219,9 @@ Example:
    are not silently ignored. The step will be marked `failed` and the
    execution status will become `failed`. The failing step records a
    diagnostic `error_message`. Two common shapes:
-    - `Template path "trigger.<key>" cannot be resolved.` — the key is
+    - `Template path "trigger.<key>" cannot be resolved.` ŌĆö the key is
       missing from the trigger payload.
-    - `Template path "steps.<N>.output.<key>" cannot be resolved.` — the step
+    - `Template path "steps.<N>.output.<key>" cannot be resolved.` ŌĆö the step
       reference is missing, future, or the key is not part of the referenced
       step's output.
 
@@ -1156,9 +1231,9 @@ Example:
 `{{ trigger. }}`). Semantic validation (whether the key exists) happens at
 execution time, not at save time.
 
-**A worked example of the multi-step pattern is in §5.18.**
+**A worked example of the multi-step pattern is in ┬º5.18.**
 
-### 5.18 Worked example — multi-step workflow with inter-step references
+### 5.18 Worked example ŌĆö multi-step workflow with inter-step references
 
 This example is the exact workflow verified end-to-end during the Gmail E2E
 Verification Pass. It is a real 7-step workflow that was run against a real
@@ -1168,7 +1243,7 @@ Gmail account.
 state twice, remove the label, then archive and trash the message. Steps 2 and
 5 reference the label ID produced by step 1.
 
-**Step order (position → action):**
+**Step order (position ŌĆÆ action):**
 
 | Position | Action           | Notes                                         |
 | -------- | ---------------- | --------------------------------------------- |
@@ -1180,7 +1255,7 @@ state twice, remove the label, then archive and trash the message. Steps 2 and
 | 6        | `archive`        | Uses `{{ trigger.message_id }}`.              |
 | 7        | `trash`          | Uses `{{ trigger.message_id }}`.              |
 
-**Step 1 — create the label**
+**Step 1 ŌĆö create the label**
 
 ```
 POST /api/workflows/{id}/steps
@@ -1208,7 +1283,7 @@ Runtime output:
 
 The key we will reference later is `label_id`.
 
-**Step 2 — apply the label, referencing step 1's output**
+**Step 2 ŌĆö apply the label, referencing step 1's output**
 
 ```
 POST /api/workflows/{id}/steps
@@ -1236,7 +1311,7 @@ At runtime, `{{ steps.1.output.label_id }}` resolves to the string
 }
 ```
 
-**Step 3 — mark the message as unread**
+**Step 3 ŌĆö mark the message as unread**
 
 ```
 {
@@ -1249,7 +1324,7 @@ At runtime, `{{ steps.1.output.label_id }}` resolves to the string
 }
 ```
 
-**Step 4 — mark the message as read**
+**Step 4 ŌĆö mark the message as read**
 
 ```
 {
@@ -1265,7 +1340,7 @@ At runtime, `{{ steps.1.output.label_id }}` resolves to the string
 Steps 3 and 4 exercise the read-state flip on the same message. Order matters:
 step 3 runs before step 4, so the final state is "read".
 
-**Step 5 — remove the label, referencing step 1's output again**
+**Step 5 ŌĆö remove the label, referencing step 1's output again**
 
 ```
 {
@@ -1280,9 +1355,9 @@ step 3 runs before step 4, so the final state is "read".
 ```
 
 Same `{{ steps.1.output.label_id }}` reference. The value is stable across
-the execution — it is the same `label_id` that step 1 returned.
+the execution ŌĆö it is the same `label_id` that step 1 returned.
 
-**Step 6 — archive the message**
+**Step 6 ŌĆö archive the message**
 
 ```
 {
@@ -1295,7 +1370,7 @@ the execution — it is the same `label_id` that step 1 returned.
 }
 ```
 
-**Step 7 — move the message to trash**
+**Step 7 ŌĆö move the message to trash**
 
 ```
 {
@@ -1478,7 +1553,7 @@ the execution — it is the same `label_id` that step 1 returned.
 - Later steps can reference earlier steps' outputs by position and key.
 - The referenced output key (`label_id`) is stable and its value is
   identical across steps 2 and 5.
-- The resolved value type is preserved — step 1's `label_id` is a string, and
+- The resolved value type is preserved ŌĆö step 1's `label_id` is a string, and
   step 2's resolved `label_id` is also a string.
 - Mobile does not need any special coordination for these references. It
   constructs the `config` object with the literal template string
@@ -1488,21 +1563,21 @@ the execution — it is the same `label_id` that step 1 returned.
 **How mobile should build this in the UI:**
 
 1. When the user adds step 1 (`create_label`), mobile can look up the action's
-   output keys in the table in §5.9. The user does not configure any output —
+   output keys in the table in ┬º5.9. The user does not configure any output ŌĆö
    outputs are produced by the backend at runtime.
 2. When the user adds step 2, and selects an action whose `config` has a
    `label_id` field, mobile can offer the user a dropdown of "referenceable
    values" composed from:
     - The trigger's payload keys (from the trigger definition in the catalog).
     - The output keys of every earlier step in the same workflow (from the
-      table in §5.9).
+      table in ┬º5.9).
 3. When the user picks "Label from step 1", mobile writes the literal string
    `"{{ steps.1.output.label_id }}"` into the step's `config.label_id`.
 
-The backend has no per-workflow opt-in or registration for these references —
+The backend has no per-workflow opt-in or registration for these references ŌĆö
 they are simply strings inside `config`, resolved at runtime.
 
-### 5.19 Additional worked example — the hero test
+### 5.19 Additional worked example ŌĆö the hero test
 
 The hero test verified end-to-end during the Gmail E2E Verification Pass:
 
@@ -1523,6 +1598,234 @@ Result on real Gmail:
 
 This example demonstrates the mix of `{{ trigger.* }}` references (four
 distinct ones in step 2) and a simple single-action step 1.
+
+### 5.20 Gmail attachment trigger
+
+The `new_email_received_with_attachment` trigger extends the
+`new_email_received` trigger to materialize the incoming message's
+attachments into the user's Google Drive before the workflow executes.
+
+#### What it does
+
+- Uses the same Gmail polling mechanism as `new_email_received`. There is
+  exactly one polling strategy; the trigger key selects the code path inside
+  it.
+- Always filters the Gmail query by `has:attachment`, so only messages that
+  actually carry an attachment reach the workflow. If the user's `query`
+  config already contains `has:attachment`, the strategy does not duplicate
+  it.
+- For every message that matches, downloads each attachment through the
+  Gmail API, uploads it to the user's own Google Drive via the `drive.file`
+  scope, and adds an `attachments` array to the trigger payload.
+- The uploaded file is owned by the user's own Google account. No public
+  permissions are set. No service-account ownership is involved.
+- Attachment download and upload run synchronously inside the scheduler
+  tick, before `RunWorkflowAction::execute()` is invoked.
+
+#### Activation requirement
+
+- The workflow's Google connection must hold both
+  `https://www.googleapis.com/auth/gmail.readonly` and
+  `https://www.googleapis.com/auth/drive.file`.
+- If the Drive scope is missing, `POST /api/workflows/{id}/activate` returns
+  HTTP 409:
+
+  ```json
+  {
+      "message": "<localized>",
+      "error": "missing_scopes",
+      "context": {
+          "location": "trigger",
+          "missing_scopes": ["https://www.googleapis.com/auth/drive.file"]
+      }
+  }
+  ```
+
+- To fix this, the user must reconnect Google with `capability: "drive"`.
+  See ┬º3.5 for the reconnect semantics.
+- Reconnecting Google with the Drive capability **does not** create a second
+  connection row. The existing connection's `scopes` array is extended.
+
+#### Runtime behavior when the Drive scope is missing
+
+- If the workflow is active but the connection no longer carries
+  `drive.file` (e.g. the user revoked the scope, or the token was
+  reissued without it), the polling strategy skips the workflow with
+  reason `drive_connection_required` and **does not advance the polling
+  cursor**. The next tick will retry once the scope is restored.
+- This is a runtime skip, not an execution. No `Execution` row is created
+  for the skipped tick.
+- Mobile is not notified of the skip via the API. If the user wants to see
+  whether a workflow is currently failing due to a missing scope, they
+  should inspect the connection's `scopes` array from
+  `GET /api/connections`.
+
+#### Trigger payload shape
+
+The payload is identical to `new_email_received`'s 14-key payload, plus a
+15th key `attachments`:
+
+```json
+{
+    "message_id": "...",
+    "thread_id": "...",
+    "from": "...",
+    "to": ["..."],
+    "cc": ["..."],
+    "subject": "...",
+    "snippet": "...",
+    "body": "...",
+    "received_at": "2026-10-05T12:00:00+00:00",
+    "received_at_epoch_ms": 1759500000000,
+    "labels": ["INBOX"],
+    "has_attachment": true,
+    "attachment_count": 1,
+    "attachment_ids": ["ANGjdJ..."],
+    "attachments": [
+        {
+            "gmail_attachment_id": "ANGjdJ...",
+            "drive_file_id": "1AbC...",
+            "web_view_link": "https://drive.google.com/file/d/1AbC.../view",
+            "filename": "invoice.pdf",
+            "mime_type": "application/pdf",
+            "size": 123456
+        }
+    ]
+}
+```
+
+**`attachment_ids` vs `attachments[].drive_file_id`:** these are unrelated.
+`attachment_ids` is the pre-existing Gmail part ID array ŌĆö internal to the
+Gmail API. `attachments[].drive_file_id` is the Drive file identifier
+produced by the materialization step. Downstream actions consume
+`attachments[].drive_file_id` (or, for read-only display, the additive
+`web_view_link`).
+
+**`attachments` is always an array, and it is always non-empty in the payloads this trigger produces.** The enriched fetch action skips any message that does not carry at least one attachment, and the `has:attachment` fragment in the Gmail query prevents non-attachment messages from being fetched in the first place. So this key is present on every payload from `new_email_received_with_attachment` and contains at least one entry.
+
+#### Attachment object fields
+
+| Field                 | Type            | Notes |
+| --------------------- | --------------- | ----- |
+| `gmail_attachment_id` | string          | Gmail-side part ID. Provider-specific traceability. Not the primary reference for downstream actions. |
+| `drive_file_id`       | string \| null  | The Drive file identifier. **This is the canonical downstream reference.** `null` when the attachment failed to materialize. |
+| `web_view_link`       | string \| null  | Google Drive web link for the uploaded file. **Additive field.** `null` when the attachment failed to materialize, or when Drive did not return a link. Possessing the link does not grant access; existing Drive permissions still apply. |
+| `filename`            | string          | Original filename from Gmail. |
+| `mime_type`           | string          | MIME type from Gmail. Defaults to `application/octet-stream` if Gmail did not return one. |
+| `size`                | integer \| null | Byte size. On success, this is the actual decoded byte size. On failure, it is the reported size from Gmail when available, or `null`. |
+| `error`               | string          | **Present only on failed attachments.** One of `gmail_download_failed` or `drive_upload_failed`. Stable machine-readable code. |
+
+#### Partial-failure policy
+
+Each attachment is processed independently. If one attachment fails to
+download or upload, the others still proceed. The failing entry retains
+`drive_file_id: null` and `web_view_link: null`, and gains a stable `error`
+code:
+
+- `gmail_download_failed` ŌĆö the Gmail API could not return the bytes.
+- `drive_upload_failed` ŌĆö the Drive API could not create the file.
+
+The workflow still executes with the partial result set. Downstream actions
+can branch on `drive_file_id != null` to handle successes only.
+
+If **all** attachments fail, the workflow still executes with every
+attachment entry carrying `drive_file_id: null` and an `error`. The
+workflow's own step logic determines whether that is acceptable.
+
+#### Payload size
+
+The materialized `attachments` array contains only metadata (file IDs,
+filenames, MIME types, sizes, links). Attachment bytes are never included in
+the trigger payload. The Drive file remains the single source of truth for
+the binary content. There are no artificial attachment count or size limits ŌĆö
+Gmail's own limits remain authoritative.
+
+### 5.21 Gmail send attachment links email action
+
+The `send_attachment_links_email` action sends one HTML email containing a
+clickable Google Drive link for each attachment that the
+`new_email_received_with_attachment` trigger has already materialized.
+
+#### Restriction
+
+This action is **only** compatible with the
+`new_email_received_with_attachment` trigger. Pairing it with
+`new_email_received` is rejected server-side at every write path (step add,
+step update, trigger upsert) and at activation:
+
+```json
+{
+  "message": "<localized>",
+  "error": "incompatible_trigger",
+  "context": {
+    "location": "step",
+    "action_key": "google.gmail.send_attachment_links_email",
+    "trigger_key": "google.gmail.new_email_received",
+    "allowed_trigger_keys": ["google.gmail.new_email_received_with_attachment"]
+  }
+}
+```
+
+Mobile should not need to filter the action out of a UI list on its own ŌĆö
+the server rejects the pairing with a clear error. Mobile may still hide the
+action when the current trigger is `new_email_received` as a UX courtesy,
+but this is not required for correctness.
+
+`new_email_received_with_attachment` remains fully usable with every other
+action, including `send_email`.
+
+#### Config fields
+
+| Field          | Type    | Required | Notes |
+| -------------- | ------- | -------- | ----- |
+| `to`           | email   | yes      | Recipient. Typically `{{ trigger.from }}`. |
+| `subject`      | string  | yes      | Subject of the outgoing email. |
+| `intro_text`   | text    | no       | Optional sentence shown above the list. |
+| `attachments`  | string  | yes      | Defaults to `{{ trigger.attachments }}`. Leave the default untouched. |
+
+The `attachments` field is typed `string` in the catalog even though the
+resolved value is an array. This is intentional: the mobile client submits
+the literal template string `"{{ trigger.attachments }}"`, and the existing
+template resolver's whole-string path returns the raw PHP array at execution
+time. No new field type is introduced, and the catalog's field-type set is
+unchanged.
+
+**Mobile should submit the field's declared `default` verbatim.** Do not
+parse, stringify, or alter the value. Do not attempt to pre-compute the
+links on the client.
+
+#### Body composition
+
+The backend iterates the resolved attachments and:
+- Skips any entry that is not an array.
+- Skips any entry whose `web_view_link` is not a string, is empty, or is
+  whitespace-only.
+- Uses the entry's `filename` as the anchor text; falls back to the literal
+  `Attachment` when `filename` is missing or empty.
+- HTML-escapes both the URL and the filename.
+
+If no eligible attachments remain, the body is:
+
+```html
+<p>Attachments could not be linked.</p>
+```
+
+If the user supplied `intro_text`, it is HTML-escaped and rendered as a
+leading `<p>...</p>` paragraph.
+
+#### Output keys
+
+`sent` (boolean), `message_id` (string | null). Identical shape to
+`send_email`. A later step can reference the output via
+`{{ steps.N.output.message_id }}`.
+
+#### What it does not do
+
+- Does not read attachment bytes from Drive. It only sends links.
+- Does not attach binary content to the outgoing email.
+- Does not create or modify Drive permissions.
+- Does not add OAuth scopes. Only `gmail.send` is required, the same scope
+  already used by `send_email`.
 
 ---
 
@@ -1548,8 +1851,8 @@ Response (HTTP 200):
 ```
 
 - `connection_id` is optional. If omitted, the backend resolves credentials via legacy user tokens.
-- If `connection_id` is supplied but is not owned by the caller → 404 `{ "message": "Connection not found" }`.
-- Errors from Gmail → HTTP 500 with a descriptive message.
+- If `connection_id` is supplied but is not owned by the caller ŌĆÆ 404 `{ "message": "Connection not found" }`.
+- Errors from Gmail ŌĆÆ HTTP 500 with a descriptive message.
 
 Why labels are separate from the catalog:
 
@@ -1560,12 +1863,12 @@ Why labels are separate from the catalog:
 **How to build the trigger config in mobile:**
 
 1. Read the trigger's `config.label_id` object from the Catalog.
-2. See `type: "select"` → render a dropdown.
-3. See `options_source.operation_id: "gmail.labels"` → resolve this operation through the API contract.
+2. See `type: "select"` ŌĆÆ render a dropdown.
+3. See `options_source.operation_id: "gmail.labels"` ŌĆÆ resolve this operation through the API contract.
 4. Substitute `{{connection_id}}` with the user's chosen Gmail connection ID.
 5. Call the endpoint. Render `data[]` as options.
-6. When the user picks a label → put its `id` into `config.label_id`.
-7. When the user picks "all mail" → omit `label_id` from `config` entirely (do NOT send `null` or `""`).
+6. When the user picks a label ŌĆÆ put its `id` into `config.label_id`.
+7. When the user picks "all mail" ŌĆÆ omit `label_id` from `config` entirely (do NOT send `null` or `""`).
 
 **No Gmail-specific hardcoding in the mobile app.** The mobile app reads `options_source` and resolves it declaratively.
 
@@ -1585,9 +1888,9 @@ Laravel standard:
 
 Returned by any route under `auth:sanctum` when the token is missing or invalid.
 
-**Exception:** `POST /api/login` returns `{ "message": "Invalid credentials." }` (also HTTP 401) for credential failures — see §1.7. That is the login-specific 401 body, not the middleware 401.
+**Exception:** `POST /api/login` returns `{ "message": "Invalid credentials." }` (also HTTP 401) for credential failures ŌĆö see ┬º1.7. That is the login-specific 401 body, not the middleware 401.
 
-The 401 body itself is not localized. Treat HTTP 401 as a state code and do not depend on the message text — see §12.3.
+The 401 body itself is not localized. Treat HTTP 401 as a state code and do not depend on the message text ŌĆö see ┬º12.3.
 
 ### 7.2 Validation (422)
 
@@ -1612,15 +1915,16 @@ Used for both "does not exist" and "belongs to another user". Mobile must not at
 
 ### 7.4 Conflict (409)
 
-- Activation without a trigger → `{ "message": "Workflow cannot be activated without a trigger" }`
-- Invalid lifecycle transition → `{ "message": "Invalid workflow state transition" }`
-- Manual execution of a paused workflow → `{ "message": "Workflow is not active" }`
-- Overlapping execution → `{ "message": "An execution is already running for this workflow" }`
-- Capability validation → structured error with `message`, `error`, `context` (see §5.12)
+- Activation without a trigger ŌĆÆ `{ "message": "Workflow cannot be activated without a trigger" }`
+- Invalid lifecycle transition ŌĆÆ `{ "message": "Invalid workflow state transition" }`
+- Manual execution of a paused workflow ŌĆÆ `{ "message": "Workflow is not active" }`
+- Overlapping execution ŌĆÆ `{ "message": "An execution is already running for this workflow" }`
+- Capability validation ŌĆÆ structured error with `message`, `error`, `context` (see ┬º5.12)
+- Trigger–action incompatibility ŌĆÆ structured error with `error: "incompatible_trigger"` (see ┬º4.7 and ┬º5.21)
 
 ### 7.5 OAuth / provider errors
 
-`GET /api/connections/google/callback` returns 302 redirects with an `error=<code>` query parameter (see §3.3). Not a JSON response.
+`GET /api/connections/google/callback` returns 302 redirects with an `error=<code>` query parameter (see ┬º3.3). Not a JSON response.
 
 ### 7.6 Server errors (500)
 
@@ -1640,7 +1944,7 @@ or
 Template path "steps.2.output.label_id" cannot be resolved.
 ```
 
-These are not HTTP errors — the workflow execution itself returns `200`/`201` with the execution object, and the failure is recorded on the execution and step records. Mobile must inspect `data.status` and `data.steps[].status`, not just the HTTP status code, to detect this class of failure.
+These are not HTTP errors ŌĆö the workflow execution itself returns `200`/`201` with the execution object, and the failure is recorded on the execution and step records. Mobile must inspect `data.status` and `data.steps[].status`, not just the HTTP status code, to detect this class of failure.
 
 ---
 
@@ -1651,7 +1955,7 @@ Preconditions:
 - User has authenticated and mobile holds a Sanctum token (via production Google OAuth, `POST /api/login`, or `/api/test/login` for dev/testing).
 - User has already connected a Gmail account with the `gmail` capability so a `connection_id` exists.
 
-Step 1 — List connections
+Step 1 ŌĆö List connections
 
 ```
 GET /api/connections
@@ -1663,7 +1967,7 @@ Pick `connection_id = 12` from `data[]`. Verify its `scopes` array contains
 `reply_to_email`) or the relevant `gmail.*` scope for the action the user
 intends to configure. If not, prompt the user to reconnect.
 
-Step 2 — Fetch catalog
+Step 2 ŌĆö Fetch catalog
 
 ```
 GET /api/catalog
@@ -1672,7 +1976,7 @@ Authorization: Bearer <token>
 
 Confirm `google.gmail` exists; read its `triggers` and `actions`.
 
-Step 3 — Create workflow
+Step 3 ŌĆö Create workflow
 
 ```
 POST /api/workflows
@@ -1681,7 +1985,7 @@ Body: { "name": "Gmail auto-reply" }
 
 Capture `id = 42`, `status = "draft"`.
 
-Step 4 — Resolve dynamic label options
+Step 4 ŌĆö Resolve dynamic label options
 
 Read `catalog.integrations[google.gmail].triggers[new_email_received].config.label_id`:
 
@@ -1697,7 +2001,7 @@ Read `catalog.integrations[google.gmail].triggers[new_email_received].config.lab
 }
 ```
 
-Resolve `gmail.labels` through the API contract → `GET /api/gmail/labels`. Substitute `{{connection_id}} = 12`. Call:
+Resolve `gmail.labels` through the API contract ŌĆÆ `GET /api/gmail/labels`. Substitute `{{connection_id}} = 12`. Call:
 
 ```
 GET /api/gmail/labels?connection_id=12
@@ -1705,15 +2009,15 @@ GET /api/gmail/labels?connection_id=12
 
 Render the returned `data[]` as a dropdown. Two possible user choices:
 
-**Case A — user picks a label (e.g. `INBOX`):** include `config.label_id` in the trigger body (Step 5).
+**Case A ŌĆö user picks a label (e.g. `INBOX`):** include `config.label_id` in the trigger body (Step 5).
 
-**Case B — user picks "all mail":** omit `config.label_id` entirely. Do not send `null` or `""`.
+**Case B ŌĆö user picks "all mail":** omit `config.label_id` entirely. Do not send `null` or `""`.
 
-Step 5 — Configure Gmail trigger
+Step 5 ŌĆö Configure Gmail trigger
 
 ```
 PUT /api/workflows/42/trigger
-Body (Case A — with label):
+Body (Case A ŌĆö with label):
 {
   "integration_key": "google.gmail",
   "trigger_key": "new_email_received",
@@ -1724,7 +2028,7 @@ Body (Case A — with label):
 
 ```
 PUT /api/workflows/42/trigger
-Body (Case B — no label):
+Body (Case B ŌĆö no label):
 {
   "integration_key": "google.gmail",
   "trigger_key": "new_email_received",
@@ -1752,7 +2056,7 @@ Body (with extra filters):
 }
 ```
 
-Step 6 — Add Gmail step
+Step 6 ŌĆö Add Gmail step
 
 Read `catalog.integrations[google.gmail].actions[<action_key>].config` for the
 field list. Two common examples:
@@ -1788,17 +2092,20 @@ Body: {
 }
 ```
 
-For a multi-step workflow with inter-step references, see §5.18.
+For a multi-step workflow with inter-step references, see ┬º5.18.
 
-Step 7 — Activate workflow
+For a workflow that emails Drive links for the incoming email's attachments,
+see ┬º5.21.
+
+Step 7 ŌĆö Activate workflow
 
 ```
 POST /api/workflows/42/activate
 ```
 
-Expect HTTP 200 with `data.status = "active"`. On HTTP 409, inspect the structured error and adjust. `error: "missing_scopes"` means the connection must be reconnected.
+Expect HTTP 200 with `data.status = "active"`. On HTTP 409, inspect the structured error and adjust. `error: "missing_scopes"` means the connection must be reconnected. `error: "incompatible_trigger"` means the action/trigger pairing is not allowed (see ┬º4.7).
 
-Step 8 — Manual execution (optional, for testing)
+Step 8 ŌĆö Manual execution (optional, for testing)
 
 ```
 POST /api/workflows/42/execute
@@ -1819,7 +2126,7 @@ Body: {
 }
 ```
 
-Step 9 — Poll execution status
+Step 9 ŌĆö Poll execution status
 
 ```
 GET /api/executions/{execution_id}
@@ -1858,47 +2165,53 @@ All of the above are backed by tests already present in the repository. No `UNSA
 
 Production-ready today:
 
-- `POST /api/register` — provisioning (creates/updates users; no token).
-- `POST /api/login` — email/password login returning a Sanctum token.
-- `POST /api/password/forgot` — request a password reset code.
-- `POST /api/password/reset` — reset the password with a valid code.
-- `GET /api/auth/google/redirect` — Google login redirect.
-- `GET /api/auth/google/callback` — Google login callback.
-- `POST /api/logout` — revoke tokens.
-- `POST /api/account/deactivate` — soft-delete account.
-- `GET /api/user` — current user.
-- `GET /api/connections` — list user connections.
-- `POST /api/connections/google/start` — start Google connection OAuth.
-- `GET /api/connections/google/callback` — connection OAuth callback.
-- `DELETE /api/connections/{connection}` — disconnect.
-- `GET /api/catalog` — catalog discovery.
-- `GET /api/gmail/labels` — list Gmail labels for a connection.
-- `GET /api/workflows` — list workflows.
-- `POST /api/workflows` — create workflow.
-- `GET /api/workflows/{id}` — show workflow.
-- `PUT /api/workflows/{id}` — update workflow.
-- `DELETE /api/workflows/{id}` — soft-delete workflow.
-- `POST /api/workflows/{id}/restore` — restore workflow.
-- `PUT /api/workflows/{id}/trigger` — upsert trigger.
-- `DELETE /api/workflows/{id}/trigger` — delete trigger.
-- `POST /api/workflows/{id}/steps` — append step.
-- `PUT /api/workflows/{id}/steps/{position}` — update step.
-- `DELETE /api/workflows/{id}/steps/{position}` — delete step.
-- `POST /api/workflows/{id}/activate` — activate.
-- `POST /api/workflows/{id}/pause` — pause.
-- `POST /api/workflows/{id}/execute` — manual execution.
-- `GET /api/workflows/{id}/executions` — list executions.
-- `GET /api/executions/{id}` — show execution.
+- `POST /api/register` ŌĆö provisioning (creates/updates users; no token).
+- `POST /api/login` ŌĆö email/password login returning a Sanctum token.
+- `POST /api/password/forgot` ŌĆö request a password reset code.
+- `POST /api/password/reset` ŌĆö reset the password with a valid code.
+- `GET /api/auth/google/redirect` ŌĆö Google login redirect.
+- `GET /api/auth/google/callback` ŌĆö Google login callback.
+- `POST /api/logout` ŌĆö revoke tokens.
+- `POST /api/account/deactivate` ŌĆö soft-delete account.
+- `GET /api/user` ŌĆö current user.
+- `GET /api/connections` ŌĆö list user connections.
+- `POST /api/connections/google/start` ŌĆö start Google connection OAuth.
+- `GET /api/connections/google/callback` ŌĆö connection OAuth callback.
+- `DELETE /api/connections/{connection}` ŌĆö disconnect.
+- `GET /api/catalog` ŌĆö catalog discovery.
+- `GET /api/gmail/labels` ŌĆö list Gmail labels for a connection.
+- `GET /api/workflows` ŌĆö list workflows.
+- `POST /api/workflows` ŌĆö create workflow.
+- `GET /api/workflows/{id}` ŌĆö show workflow.
+- `PUT /api/workflows/{id}` ŌĆö update workflow.
+- `DELETE /api/workflows/{id}` ŌĆö soft-delete workflow.
+- `POST /api/workflows/{id}/restore` ŌĆö restore workflow.
+- `PUT /api/workflows/{id}/trigger` ŌĆö upsert trigger.
+- `DELETE /api/workflows/{id}/trigger` ŌĆö delete trigger.
+- `POST /api/workflows/{id}/steps` ŌĆö append step.
+- `PUT /api/workflows/{id}/steps/{position}` ŌĆö update step.
+- `DELETE /api/workflows/{id}/steps/{position}` ŌĆö delete step.
+- `POST /api/workflows/{id}/activate` ŌĆö activate.
+- `POST /api/workflows/{id}/pause` ŌĆö pause.
+- `POST /api/workflows/{id}/execute` ŌĆö manual execution.
+- `GET /api/workflows/{id}/executions` ŌĆö list executions.
+- `GET /api/executions/{id}` ŌĆö show execution.
 
 Non-production:
 
-- `POST /api/test/login` — dev-only. Must not be reachable in production. See §1.5.
+- `POST /api/test/login` ŌĆö dev-only. Must not be reachable in production. See ┬º1.5.
 
-The ten Gmail actions (`send_email`, `reply_to_email`, `create_draft`,
+The eleven Gmail actions (`send_email`, `reply_to_email`, `create_draft`,
 `mark_as_read`, `mark_as_unread`, `archive`, `trash`, `add_label`,
-`remove_label`, `create_label`) are not standalone HTTP endpoints. They are
-executed through the generic workflow step API (`POST /api/workflows/{id}/steps`
-with `integration_key = "google.gmail"` and the corresponding `action_key`).
+`remove_label`, `create_label`, `send_attachment_links_email`) are not
+standalone HTTP endpoints. They are executed through the generic workflow
+step API (`POST /api/workflows/{id}/steps` with
+`integration_key = "google.gmail"` and the corresponding `action_key`).
+
+The two Gmail triggers (`new_email_received`, `new_email_received_with_attachment`)
+are configured through the generic workflow trigger API
+(`PUT /api/workflows/{id}/trigger` with `integration_key = "google.gmail"`
+and the corresponding `trigger_key`).
 
 ---
 
@@ -1907,19 +2220,21 @@ with `integration_key = "google.gmail"` and the corresponding `action_key`).
 - Email verification flow. Not implemented.
 - Refresh-token / long-lived token policy. Not implemented.
 - Per-device token revocation. Not implemented.
-- Login endpoint rate limiting. Proposed, not yet applied. See §1.7.
+- Login endpoint rate limiting. Proposed, not yet applied. See ┬º1.7.
 - Environment gating of `/api/test/login`. The endpoint is dev-only by convention but is not environment-gated at the route level. Planned for Phase 9 Security Hardening.
 - `requires_connection` catalog flag. Not implemented.
-- **Catalog-level output schema declaration.** The catalog exposes action inputs only. Output keys are documented in §5.9 of this contract. There is currently no `outputSchema` field in the catalog response — mobile must hardcode the output keys from §5.9 for Gmail actions, and must not assume any output keys for Calendar / Sheets / Docs / Analytics.
+- **Catalog-level output schema declaration.** The catalog exposes action inputs only. Output keys are documented in ┬º5.9 of this contract. There is currently no `outputSchema` field in the catalog response ŌĆö mobile must hardcode the output keys from ┬º5.9 for Gmail actions, and must not assume any output keys for Calendar / Sheets / Docs / Analytics.
+- **Catalog-level exposure of `allowedTriggerKeys`.** The action-level trigger restriction is enforced server-side, but the restriction list is not published in the catalog. Mobile must handle the HTTP 409 `incompatible_trigger` response. Proactively hiding incompatible actions in the UI is a UX courtesy, not a correctness requirement.
 - Field metadata for Calendar / Sheets / Docs / Analytics actions. Not implemented.
 - Runtime handlers for Calendar / Sheets / Docs / Analytics workflow step actions. Not implemented.
-- Gmail attachment byte retrieval. Deferred until the Drive/storage architecture exists. Only metadata (`has_attachment`, `attachment_count`, `attachment_ids`) is available.
+- **Gmail attachment byte retrieval for downstream workflow consumption as binary content.** The `new_email_received_with_attachment` trigger materializes attachments into the user's Drive and exposes them via `attachments[].drive_file_id` and `attachments[].web_view_link`. There is **no action** that reads attachment bytes back out of Drive. `send_attachment_links_email` sends links, not bytes.
 - Gmail Push (`users.watch`), Google Pub/Sub, `historyId` cursors. Not implemented.
 - Retry / DLQ infrastructure. Not implemented.
 - Catalog caching / ETag / multi-endpoint catalog. Not implemented.
 - Project-supplied `lang/{locale}/validation.php` overrides. As of this contract version, only the framework default `en` translations are guaranteed. Per-field 422 messages for locales other than `en` fall back to the framework default until project overrides are added.
 - Localization of `TestLoginController` and the Facebook controllers. Their source files were not supplied during the localization pass. They remain English-only. `/api/test/login` is dev-only in any case.
-- Localization of raw business-result `message` strings embedded inside action result payloads (for example, Google Sheets row-append result `message`, Google Docs append-text result `message`). These are part of the business-result body, not the controller envelope, and remain English.
+- Localization of raw business-result `message` strings embedded inside action result payloads.
+- Live end-to-end verification of `send_attachment_links_email` against a real Gmail mailbox.
 
 ---
 
@@ -1927,8 +2242,8 @@ with `integration_key = "google.gmail"` and the corresponding `action_key`).
 
 ### 12.1 Supported locales
 
-- `en` — English (default, fallback).
-- `ar` — Arabic.
+- `en` ŌĆö English (default, fallback).
+- `ar` ŌĆö Arabic.
 
 Any other value is ignored by the server.
 
@@ -1937,7 +2252,7 @@ Any other value is ignored by the server.
 The only client-facing locale mechanism is the standard `Accept-Language`
 request header.
 
-- Regional variants are normalized: `en-US`, `en-GB` → `en`; `ar-EG`, `ar-SA` → `ar`.
+- Regional variants are normalized: `en-US`, `en-GB` ŌĆÆ `en`; `ar-EG`, `ar-SA` ŌĆÆ `ar`.
 - Candidate languages are ordered by their `q` value.
 - Candidates with `q=0` are treated as explicitly unacceptable and skipped.
 - Candidates whose normalized form is not in the supported list are skipped,
@@ -1967,16 +2282,14 @@ Localized (HTTP response body only):
   response, for every integration, action, trigger, and config field.
 - The `message` field on the two password reset endpoints (`/api/password/forgot`,
   `/api/password/reset`) and the body of the OTP email.
+- The `message` field on `409 incompatible_trigger` responses.
 
 NOT localized (remains English, by design):
 
-- `execution_steps.error_message` and `executions.error_message` — internal
+- `execution_steps.error_message` and `executions.error_message` ŌĆö internal
   diagnostics; remain English in the database and in every API response.
 - Raw provider / business-result `message` strings returned inside action
-  result payloads (for example, Google Sheets row-append result, Google Docs
-  append-text result, Google Sheets add/delete/update/clear result). These
-  are part of the business-result body, not the controller envelope, and
-  remain English.
+  result payloads.
 - Every `$e->getMessage()` diagnostic payload, Google exception message,
   `trace`, `file`, and `line` field.
 - The 401 body `{ "message": "Unauthenticated." }` emitted by Laravel's
@@ -1988,8 +2301,11 @@ NOT localized (remains English, by design):
 - Machine-readable identifiers, always: `integration_key`, `action_key`,
   `trigger_key`, `provider_key`, field `key`, field `type`, `capability`,
   `strategy`, `operation_id`, connection `status`, workflow `status`,
-  execution `status`, step `status`, capability error codes on `error`,
-  the `error` query parameter on the OAuth callback.
+  execution `status`, step `status`, capability error codes on `error`
+  (including `incompatible_trigger`), the `allowed_trigger_keys` array on the
+  `incompatible_trigger` context, the `error` query parameter on the OAuth
+  callback, and the `error` field on each attachment entry inside
+  `trigger.attachments`.
 - User-supplied data (workflow names, email subjects, etc.).
 
 ### 12.4 Catalog
@@ -2018,7 +2334,7 @@ files installed:
 ```json
 {
     "message": "The given data was invalid.",
-    "errors": { "email": ["حقل البريد الإلكتروني مطلوب."] }
+    "errors": { "email": ["žŁ┘é┘ä ž¦┘äž©ž▒┘Ŗž» ž¦┘äžź┘ä┘āž¬ž▒┘ł┘å┘Ŗ ┘ģžĘ┘ä┘łž©."] }
 }
 ```
 
@@ -2030,8 +2346,9 @@ The following are identical regardless of `Accept-Language`:
 - All HTTP status codes.
 - All response envelope shapes (`{ message }`, `{ message, data }`,
   `{ message, errors }`, `{ error }`, `{ error, context }`).
-- All identifier values listed in §12.3.
-- All capability error codes and their `context` payload keys.
+- All identifier values listed in ┬º12.3.
+- All capability error codes and their `context` payload keys, including
+  `incompatible_trigger` and its `allowed_trigger_keys` list.
 - All OAuth query-parameter names and error codes.
 - All `Accept-Language`-insensitive data payloads (`data.*`).
 
@@ -2040,7 +2357,7 @@ The following are identical regardless of `Accept-Language`:
 - Rely on the platform HTTP client's default `Accept-Language` header.
   No additional client work is required to receive a localized response.
 - Detect error classes by HTTP status code and by structured fields
-  (`errors.<field>`, `error`, `context.error`) — not by the top-level
+  (`errors.<field>`, `error`, `context.error`) ŌĆö not by the top-level
   `message` string.
 - Do not send `X-Locale`, `?locale=`, or any stored locale preference.
 
@@ -2053,8 +2370,8 @@ The following are identical regardless of `Accept-Language`:
 Two public endpoints support password reset via email OTP:
 
 ```
-POST /api/password/forgot    — request a reset code
-POST /api/password/reset     — verify the code and set a new password
+POST /api/password/forgot    ŌĆö request a reset code
+POST /api/password/reset     ŌĆö verify the code and set a new password
 ```
 
 Both endpoints are public (no authentication required). Both return generic
@@ -2088,10 +2405,10 @@ Rate limits:
 - 5 requests per email address per hour.
 - 20 requests per IP address per hour.
 
-Exceeded limits → HTTP 429 `{ "message": "Too many requests. Please try again later." }`
+Exceeded limits ŌĆÆ HTTP 429 `{ "message": "Too many requests. Please try again later." }`
 with a `Retry-After` header.
 
-The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
+The `message` value localizes when the request carries `Accept-Language: ar` ŌĆö see ┬º12.
 
 ### 13.3 Reset password
 
@@ -2104,9 +2421,9 @@ Body: {
 }
 ```
 
-- `email` — required, valid email.
-- `code` — required, string, 4–10 characters (default 6).
-- `password` — required, string, minimum 6 characters.
+- `email` ŌĆö required, valid email.
+- `code` ŌĆö required, string, 4ŌĆō10 characters (default 6).
+- `password` ŌĆö required, string, minimum 6 characters.
 
 Success (HTTP 200):
 
@@ -2137,7 +2454,7 @@ Rate limits:
 - 20 requests per email address per hour.
 - 60 requests per IP address per hour.
 
-Exceeded limits → HTTP 429 with `Retry-After`.
+Exceeded limits ŌĆÆ HTTP 429 with `Retry-After`.
 
 Behavior on success:
 
@@ -2145,7 +2462,7 @@ Behavior on success:
 - All active Sanctum tokens for that user are revoked. The user must log in
   again with the new password.
 
-The `message` value localizes when the request carries `Accept-Language: ar` — see §12.
+The `message` value localizes when the request carries `Accept-Language: ar` ŌĆö see ┬º12.
 
 ### 13.4 Security notes
 
@@ -2171,7 +2488,7 @@ The reset email is a project-owned Blade template rendered by Laravel. It contai
 - A note that the user can ignore the email if they did not request it.
 
 The email is sent in the request locale, resolved from the `Accept-Language`
-header (see §12). The email body text is localized via `identity::messages.*`.
+header (see ┬º12). The email body text is localized via `identity::messages.*`.
 
 ### 13.6 Production requirements
 
@@ -2198,19 +2515,27 @@ A: Both `POST /api/login` (email/password) and the production Google OAuth flow 
 A: Three:
 
 - Production Google OAuth (`/api/auth/google/redirect` + callback).
-- Production email/password login (`POST /api/login`) — for users who have a password set via the provisioning flow (`POST /api/register`) or another path.
+- Production email/password login (`POST /api/login`) ŌĆö for users who have a password set via the provisioning flow (`POST /api/register`) or another path.
 - Dev-only `/api/test/login` for local development.
 
-All three return a Sanctum bearer token, which the mobile client uses identically. Password reset (`/api/password/forgot` + `/api/password/reset`) is a separate recovery flow — it does not issue a token; the user logs in again with the new password.
+All three return a Sanctum bearer token, which the mobile client uses identically. Password reset (`/api/password/forgot` + `/api/password/reset`) is a separate recovery flow ŌĆö it does not issue a token; the user logs in again with the new password.
 
 **Q: Can a workflow have multiple steps that reference each other?**
 
-A: Yes. Steps can reference an earlier step's output via `{{ steps.N.output.<key> }}`, where `N` is the 1-based position of an earlier step in the same workflow. The referenced `<key>` must be one of the keys that the earlier step's action actually returns. The verified output keys for all Gmail actions are listed in §5.9. A full worked example is in §5.18. Whole-template resolution preserves the resolved value's type; invalid or future-step references fail the step at runtime with a descriptive `error_message`.
+A: Yes. Steps can reference an earlier step's output via `{{ steps.N.output.<key> }}`, where `N` is the 1-based position of an earlier step in the same workflow. The referenced `<key>` must be one of the keys that the earlier step's action actually returns. The verified output keys for all Gmail actions are listed in ┬º5.9. A full worked example is in ┬º5.18. Whole-template resolution preserves the resolved value's type (including arrays); invalid or future-step references fail the step at runtime with a descriptive `error_message`.
 
 **Q: Does the API support Arabic and English responses?**
 
-A: Yes. Every user-facing `message`/`error` field produced by project controllers localizes based on the standard `Accept-Language` request header, as do all catalog `label`/`description` values. Machine-readable identifiers, HTTP status codes, and response envelope shapes are identical across locales. Execution diagnostics, raw provider messages, and Laravel-emitted framework strings (401 body, 422 top-level message) remain English. Full details in §12.
+A: Yes. Every user-facing `message`/`error` field produced by project controllers localizes based on the standard `Accept-Language` request header, as do all catalog `label`/`description` values. Machine-readable identifiers, HTTP status codes, and response envelope shapes are identical across locales. Execution diagnostics, raw provider messages, and Laravel-emitted framework strings (401 body, 422 top-level message) remain English. Full details in ┬º12.
+
+**Q: Does the Gmail attachment trigger require Drive access on the Google connection?**
+
+A: Yes. `new_email_received_with_attachment` requires the Google connection to hold `https://www.googleapis.com/auth/drive.file` in addition to the Gmail scopes. Activation fails with HTTP 409 `{ "error": "missing_scopes", "context": { "missing_scopes": [".../drive.file"] } }` if the Drive scope is absent. At runtime, if the scope is missing, the polling strategy skips the workflow with reason `drive_connection_required` without advancing the cursor. See ┬º5.20.
+
+**Q: Can an action be restricted to a specific trigger?**
+
+A: Yes. The server declares a `allowedTriggerKeys` list on some actions. When a workflow pairs a restricted action with a trigger outside that list, the workflow API rejects the operation with HTTP 409 `error: "incompatible_trigger"` at every write path and at activation. The list is not exposed in the catalog; mobile must handle the 409. The only restricted action today is `send_attachment_links_email` (see ┬º5.21). All other actions are unrestricted. See ┬º4.7.
 
 **Q: Can the Mobile Developer start integrating tomorrow?**
 
-A: Yes. Use `/api/login` for users who have email/password credentials, or the Google OAuth flow for users who sign in with Google. Every endpoint needed to build the automation UI is present, authenticated, and owner-scoped. The Catalog uses the same canonical identifiers as the Workflow API, so no client-side mapping layer is required. See §5.7 for the one config-handling pitfall (`label_id`) that must be handled correctly on the mobile side. See §3.5 for the Gmail reconnect requirement when the user wants to use the newer Gmail actions. See §5.9 for the verified output keys per Gmail action, and §5.17 and §5.18 for how to build multi-step workflows with `{{ steps.N.output.* }}` references. See §12 for localization. See §13 for the password reset contract.
+A: Yes. Use `/api/login` for users who have email/password credentials, or the Google OAuth flow for users who sign in with Google. Every endpoint needed to build the automation UI is present, authenticated, and owner-scoped. The Catalog uses the same canonical identifiers as the Workflow API, so no client-side mapping layer is required. See ┬º5.7 for the one config-handling pitfall (`label_id`) that must be handled correctly on the mobile side. See ┬º3.5 for the Gmail/Drive reconnect requirement. See ┬º4.7 for the trigger–action compatibility rule. See ┬º5.9 for the verified output keys per Gmail action, ┬º5.17 and ┬º5.18 for how to build multi-step workflows with `{{ steps.N.output.* }}` references, ┬º5.20 for the attachment trigger, ┬º5.21 for the attachment links email action, ┬º12 for localization, and ┬º13 for the password reset contract.

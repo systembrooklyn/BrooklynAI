@@ -11,6 +11,7 @@ use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailMarkAsReadHandle
 use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailMarkAsUnreadHandler;
 use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailRemoveLabelHandler;
 use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailReplyToEmailHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailSendAttachmentLinksEmailHandler;
 use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailSendEmailHandler;
 use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailTrashHandler;
 
@@ -30,6 +31,7 @@ final class HandlerRegistry
         'google.gmail.add_label' => GmailAddLabelHandler::class,
         'google.gmail.remove_label' => GmailRemoveLabelHandler::class,
         'google.gmail.create_label' => GmailCreateLabelHandler::class,
+        'google.gmail.send_attachment_links_email' => GmailSendAttachmentLinksEmailHandler::class,
     ];
 
     /**

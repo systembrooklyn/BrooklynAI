@@ -17,10 +17,6 @@ class ListSpreadsheetsController extends Controller
         ListSpreadsheetsRequest $request,
         ListSpreadsheetsAction $action,
     ): JsonResponse {
-        Log::info('Auth check', [
-            'user' => Auth::check() ? 'Authenticated' : 'Not authenticated',
-            'token' => request()->bearerToken() ?: 'No token',
-        ]);
 
         $user = $request->user();
 

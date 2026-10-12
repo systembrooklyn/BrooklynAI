@@ -4,6 +4,7 @@ namespace App\Modules\Automation\Application\Actions;
 
 use App\Modules\Automation\Application\DTOs\TriggerData;
 use App\Modules\Automation\Application\DTOs\UpsertWorkflowTriggerInput;
+use App\Modules\Automation\Application\Services\WorkflowTriggerActionCompatibilityValidator;
 use App\Modules\Automation\Core\Contracts\TemplateResolver;
 use App\Modules\Automation\Core\Entities\WorkflowTrigger;
 use App\Modules\Automation\Core\Exceptions\WorkflowNotFoundException;
@@ -21,6 +22,7 @@ final class UpsertWorkflowTriggerAction
         private readonly ConnectionRepository $connections,
         private readonly IntegrationCatalog $catalog,
         private readonly TemplateResolver $templates,
+        private readonly WorkflowTriggerActionCompatibilityValidator $compatibility,
     ) {}
 
     public function execute(UpsertWorkflowTriggerInput $input): TriggerData
@@ -48,6 +50,19 @@ final class UpsertWorkflowTriggerAction
 
         if ($triggerDef === null) {
             throw new InvalidArgumentException('Unknown trigger for this integration.');
+        }
+
+        // Trigger/action compatibility: every existing step must remain
+        // valid under the new trigger. Checked before persisting so a failed
+        // replacement leaves the previous trigger intact.
+        foreach ($this->workflows->listStepsForWorkflow($input->workflowId) as $step) {
+            $this->compatibility->validate(
+                location: 'step:'.$step->position,
+                actionIntegrationKey: $step->integrationKey,
+                actionKey: $step->actionKey,
+                triggerIntegrationKey: $input->integrationKey,
+                triggerKey: $input->triggerKey,
+            );
         }
 
         if ($input->connectionId !== null) {

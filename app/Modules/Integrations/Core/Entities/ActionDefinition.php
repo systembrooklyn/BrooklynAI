@@ -10,6 +10,9 @@ final class ActionDefinition
     /**
      * @param  ScopeIdentifier[]  $requiredScopes
      * @param  FieldDefinition[]  $fields
+     * @param  array<int, string>|null  $allowedTriggerKeys
+     *         Qualified trigger keys ("<integration_key>.<trigger_key>") this
+     *         action may be paired with. Null or empty means unrestricted.
      */
     public function __construct(
         public readonly string $key,
@@ -20,5 +23,6 @@ final class ActionDefinition
         public readonly array $fields = [],
         public readonly ?string $labelKey = null,
         public readonly ?string $descriptionKey = null,
+        public readonly ?array $allowedTriggerKeys = null,
     ) {}
 }

@@ -35,6 +35,13 @@ Without a working mail transport, the password reset flow silently fails to deli
 
 The production scheduler is driven by Google Apps Script installed as a time-driven trigger.
 
+**Current status (2026-10-12):** the Apps Script project exists with the
+correct Script Properties, but the 5-minute time-driven trigger is **not
+currently installed**. The Triggers page shows "No results". Automation
+therefore relies on manual `POST /api/internal/scheduler/tick` calls until
+the trigger is installed. Installation is a deliberate operator action; see
+the setup steps below.
+
 Apps Script responsibilities:
 
 1. Wake up on schedule (every 5 minutes).
@@ -186,6 +193,14 @@ The endpoint executes synchronously. It must complete within the platform HTTP r
 
 The endpoint does **not** require a queue worker.
 
+**Observed tick duration (2026-10-12, local):** approximately 23.5 seconds
+for a single Gmail-attachment workflow (list + get + attachment download +
+Drive upload + Gmail send + status writes, all synchronous). Under a default
+`php max_execution_time` of 30 seconds this is close to the ceiling. Real
+production tick durations must be measured after deployment and the
+`INTERNAL_SCHEDULER_BATCH_SIZE` reduced if the total due work approaches the
+platform HTTP request timeout.
+
 ---
 
 ## 5. Queue Worker (legacy)
@@ -251,6 +266,11 @@ Persistent storage:
 - `CACHE_STORE` — must be shared and persistent.
 - `QUEUE_CONNECTION` — persistent backend if the queue is used.
 
+**No additional environment variables are introduced by the Gmail attachment
+trigger.** The Drive scope is an OAuth authorization concern, not an env var.
+Users reauthorize their existing Google connection via
+`POST /api/connections/google/start` with `capability: "drive"` (see §15).
+
 ---
 
 ## 8. Gmail poll cadence
@@ -303,6 +323,11 @@ The Gmail trigger is at-least-once, not exactly-once.
 - If the tick is interrupted mid-batch, unprocessed messages will be re-fetched on the next tick within the overlap window.
 
 None of these guarantees exactly-once external side effects. If the Gmail API accepts a send and the response is lost, a retry will send the message again. This is an inherent limitation of the Gmail API.
+
+The same applies to the attachment trigger's Drive uploads: a lost response
+from the Drive API may result in a duplicate file being uploaded on retry.
+Duplicate fetches are deduplicated by the execution idempotency key, but the
+Drive API itself does not offer exactly-once file creation semantics.
 
 ---
 
@@ -365,11 +390,55 @@ Workflow activation already surfaces this as `409 missing_scopes` with the
 missing scope URI in `context.missing_scopes`, so the client can prompt the
 user to reconnect.
 
-**Attachment binary retrieval is deferred.** The Gmail trigger payload exposes
-`has_attachment`, `attachment_count`, and `attachment_ids`, but there is no
-action that downloads attachment bytes. This is intentional and will remain
-until the Drive/storage architecture exists. Do not put large base64 attachment
-payloads into execution records.
+---
+
+## 15.1 Gmail attachment trigger — Drive scope requirement
+
+The Gmail attachment trigger (`new_email_received_with_attachment`)
+materializes each incoming message's attachments into the user's own Google
+Drive. It therefore requires the existing Google connection to also hold:
+
+- `https://www.googleapis.com/auth/drive.file`
+
+This is requested via the `drive` capability in `CapabilityScopeMap`. It is
+a distinct capability from `gmail`, added after the initial Gmail integration
+completion.
+
+**Operational impact for existing users:**
+
+- Users who connected Google before the attachment trigger was implemented
+  must reauthorize the **same** connection with `capability: "drive"`.
+  Reauthorization extends the existing connection's `scopes` array in place;
+  it does **not** create a second connection row, and it does **not** remove
+  the Gmail scopes already granted.
+- Users who only use `new_email_received` (the lightweight Gmail trigger)
+  continue to work without any change. They do not need to reconnect.
+- Users who create a new workflow using
+  `new_email_received_with_attachment` will receive HTTP 409
+  `error: "missing_scopes"` at activation time if their connection lacks the
+  Drive scope. The mobile client should surface this as "please reconnect
+  your Google account with the Drive capability" and re-run
+  `POST /api/connections/google/start` with `capability: "drive"`.
+
+**Runtime behavior when the Drive scope is missing on an already-active
+workflow:**
+
+- The polling strategy returns `StrategyResult::skipped('drive_connection_required')`.
+- The polling cursor for that trigger is **not advanced**. The next tick
+  retries once the scope is restored.
+- No execution row is created for the skipped tick.
+- A warning is emitted in the Laravel log.
+
+**No separate Drive connection is created.** The scope is added to the
+existing Google connection. There is no `capabilities` column in the
+`connections` table, and no additional OAuth flow was introduced beyond
+`capability: "drive"` on the existing endpoint.
+
+**Attachment binary retrieval by a workflow step is not implemented.** The
+trigger materializes the bytes into the user's Drive and exposes the
+resulting file ID to the workflow as `trigger.attachments[].drive_file_id`.
+There is no action that reads the bytes back out of Drive into execution
+output. Consuming actions consume `drive_file_id`, not bytes.
 
 ---
 
@@ -626,6 +695,9 @@ this in the mobile client before deployment.
 [ ] Apps Script 5-minute trigger installed
 [ ] Google Cloud Console: OAuth redirect URIs include GOOGLE_CONNECTIONS_REDIRECT_URI
 [ ] FRONTEND_CONNECTIONS_REDIRECT configured
+[ ] Gmail attachment trigger users have been informed about the Drive scope
+    requirement, and the mobile client has been updated to prompt for
+    reconnection with capability="drive" (see §15.1)
 [ ] Full test suite green (last verified: 752 passed / 2267 assertions)
 ```
 
@@ -656,6 +728,43 @@ this in the mobile client before deployment.
 18. `POST /api/password/reset` with the same (now used) code → 422, generic failure.
 19. Repeat `/forgot` six times in quick succession → the 6th returns 429 with a `Retry-After` header.
 
+### Gmail attachment trigger smoke test
+
+The following steps verify the operational readiness of the attachment
+trigger. They are a smoke test, not a substitute for the live end-to-end
+verification described in §20 as an outstanding item.
+
+20. `GET /api/connections` with a valid user token → confirm the Google
+    connection's `scopes` array includes
+    `https://www.googleapis.com/auth/drive.file`. If not, reauthorize the
+    connection:
+    ```
+    POST /api/connections/google/start
+    { "capability": "drive" }
+    ```
+    Complete the Google consent flow. Re-fetch connections to confirm the
+    scope is now present and the connection's `id` is unchanged.
+21. `GET /api/catalog` → confirm `google.gmail` lists two triggers, including
+    `new_email_received_with_attachment`.
+22. Create a workflow whose trigger is `new_email_received_with_attachment`
+    and whose single step is a low-risk action such as `mark_as_read`.
+    Activate it. Expect HTTP 200. If the connection lacks the Drive scope,
+    expect 409 `error: "missing_scopes"` and the Drive scope URI in
+    `context.missing_scopes`.
+23. Send an external email with one small attachment to the connected Gmail
+    account.
+24. Within two ticks (≈10 minutes), verify a new execution appears in
+    `GET /api/workflows/{id}/executions`.
+25. `GET /api/executions/{id}` → inspect
+    `trigger_payload.attachments[0].drive_file_id`. It should be a non-null
+    string. `trigger_payload.attachments[0].error` should not be present.
+26. Confirm the file appears in the user's Google Drive and is private (not
+    shared publicly).
+27. (Optional) Revoke the Drive scope in the user's Google account settings
+    and force a tick. The next execution should not appear; the log should
+    show `drive_connection_required`. Reconnect the Drive scope to restore
+    the workflow.
+
 ---
 
 ## 20. Known limitations
@@ -663,7 +772,7 @@ this in the mobile client before deployment.
 - DigitalOcean App Platform does not allow multiple long-lived processes in a single Web Service container. The external clock approach (Apps Script) sidesteps this.
 - Apps Script is a single point of failure for the scheduler. If the trigger is disabled or the script is deleted, automation stops.
 - Consumer Apps Script accounts cannot sustain more than ~18 seconds per tick. Long ticks exhaust the daily quota.
-- The new scheduler path is synchronous. Very large batches will exceed the platform HTTP request timeout.
+- The new scheduler path is synchronous. Very large batches will exceed the platform platform HTTP request timeout.
 - Gmail delivery is at-least-once. No exactly-once guarantee.
 - Password reset email delivery is **synchronous** inside the HTTP request. Under Gmail SMTP with slow responses, `/api/password/forgot` may take several seconds. Migrating the notification to a queue removes this coupling but requires a queue worker.
 - Gmail SMTP has a daily sending cap (~500/day consumer, ~2,000/day Workspace). This cap is shared across all email the account sends, including password reset OTPs. Migrate to a transactional provider before production volume.
@@ -671,6 +780,64 @@ this in the mobile client before deployment.
 - `MAIL_MAILER=log` silently hides OTPs in `storage/logs/laravel.log`. This is a functional and security issue.
 - `password_reset_otps` rows accumulate. No automatic cleanup is scheduled. Rows are unique by email so growth is bounded by the number of distinct email addresses that ever requested a reset, but stale rows are not removed automatically.
 - Real Gmail E2E verification of the Gmail integration was completed. Password reset was verified manually via Postman + Gmail SMTP.
+- **Tick duration headroom.** A single-attachment workflow ticked in ~23.5
+  seconds on the local environment. Multiple due workflows in the same tick
+  chain synchronously and can exceed the platform HTTP request timeout.
+  `INTERNAL_SCHEDULER_BATCH_SIZE` must be tuned against measured production
+  durations, not assumed.
+- **Drive link recipients need existing permission.** Files created by
+  `GoogleDriveFileUploader` are private to the user's own Google account
+  (`drive.file` scope, no public permissions). An external recipient of a
+  `send_attachment_links_email` email cannot open the link without first
+  being granted access by the file owner. This is intentional per
+  ADR-028 §"Connection Credentials" and the design of the action, but it is
+  a product-level limitation that should be communicated to users who intend
+  the action to serve as an external file-sharing mechanism.
+- **Idempotency counter ambiguity.** A tick that finds messages but skips all
+  of them via the `gmail:{workflow_id}:{message_id}` idempotency key returns
+  `{"processed": 1, "executed": 0, "skipped": 0}`. A tick with no matching
+  messages returns `{"processed": 0, "executed": 0, "skipped": 0}`. Both
+  surface as "the tick ran but did nothing". Not a defect; recorded as an
+  observability note for future response-envelope clarification.
+
+### Gmail attachment trigger — known limitations
+
+- **Live end-to-end verification of the attachment trigger's materialization
+  path against a real Gmail mailbox has not been reported.** The automated
+  tests exercise the branching logic, the payload builder, the materializer,
+  the enriched fetch action, and the activation validation, but they do not
+  exercise the live Gmail → Drive data path. Before relying on the attachment
+  trigger in production, complete the smoke test in §19 (steps 20–27) and
+  verify a real attachment flows from a real email into the user's Drive.
+- **Attachment materialization runs synchronously inside the scheduler
+  tick.** A message with many large attachments will extend the tick's
+  duration. Under a 5-minute external clock and the conservative
+  `INTERNAL_SCHEDULER_BATCH_SIZE`, a single message with attachments near
+  Gmail's maximum (25 MB per message) can noticeably lengthen the tick.
+  Monitor tick durations in production and lower the batch size if needed.
+- **The tick's HTTP request timeout bounds the achievable attachment size.**
+  There is no artificial per-attachment or per-message size limit in the
+  code — Gmail's own limit is authoritative — but a tick that exceeds the
+  platform HTTP request timeout will be terminated by the platform. Any
+  attachment materialization that has not completed by that point will not
+  persist a successful result.
+- **Partial failures are silent to the caller.** A failed attachment
+  download or upload does not create a separate notification. The failure is
+  recorded in the execution's `trigger_payload.attachments[N].error` and in
+  the Laravel log. Downstream actions consume
+  `attachments[N].drive_file_id`, which is `null` on failure.
+- **A missing Drive scope on the connection does not surface in the API
+  responses of the workflow itself.** The skip is silent — the workflow
+  simply does not execute for the tick. The mobile client should detect
+  this by comparing the connection's `scopes` array against the trigger's
+  required scopes, and prompt the user to reconnect if needed.
+- **There is no automated cleanup of Drive files created by the attachment
+  trigger.** Every attachment materialization creates a new Drive file
+  owned by the user. If a user deletes the workflow, the previously
+  materialized Drive files remain in their Drive. This is by design — the
+  file is user-owned data, not platform data — but it means Drive storage
+  grows over time. Users should be told in the app's documentation that
+  materialized attachments persist in their Drive.
 
 ---
 

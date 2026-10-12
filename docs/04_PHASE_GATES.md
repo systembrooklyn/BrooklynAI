@@ -703,7 +703,7 @@ Status: `COMPLETE` (documentation-only).
 Deliverables:
 
 - No code changes. Attachment metadata (`has_attachment`, `attachment_count`, `attachment_ids`) is already produced by `GmailMessagePayloadBuilder` and reaches every execution's `trigger_payload`.
-- Attachment binary retrieval deferred until Drive/storage architecture exists.
+- Attachment materialization is a separate concern, implemented by the later "Gmail Attachment Trigger" branch. What remains deferred here is narrower: a downstream action that reads attachment bytes back out of Drive into a workflow step. There is no such action today.
 
 ## Gmail Integration Gate
 
@@ -712,7 +712,6 @@ Deliverables:
 - [x] Five Gmail scopes declared in `CapabilityScopeMap`.
 - [x] `GmailMessagePayloadBuilder` still produces the canonical 14-key payload.
 - [x] Attachment metadata available in every trigger payload.
-- [x] Attachment binary retrieval explicitly deferred.
 - [x] No new HTTP endpoints; no new Swagger operations.
 - [x] Existing workflows using only `send_email`, `reply_to_email`, `new_email_received` are unaffected by scope expansion.
 - [x] Full suite green at Gmail close: 752 passed / 2267 assertions / 0 failures.
@@ -1074,48 +1073,224 @@ Password Reset is `COMPLETE`.
 
 ---
 
+# Gmail Attachment Trigger (feature Batches 1–6)
+
+Post-Phase-8 branch. Not a numbered phase.
+
+This section uses its own feature-internal batch numbering (Batches 1–6).
+It is distinct from the project's numbered phases and from the earlier
+Production Scheduler Hardening and Gmail Integration Completion branches.
+
+## Goal
+
+Allow a workflow to be triggered by a Gmail message that carries at least
+one attachment, and to materialize those attachments into the user's own
+Google Drive before the workflow executes. The existing
+`new_email_received` trigger must remain unaffected.
+
+## Architectural constraint
+
+There remains exactly one Gmail polling mechanism. Both trigger keys share
+the existing `GmailPollStrategy`. No second scheduler, no second polling
+loop, no second cursor, no second idempotency mechanism.
+
+## Batch 1 — Drive OAuth capability plumbing
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `CapabilityScopeMap::CAPABILITIES['drive'] = ['https://www.googleapis.com/auth/drive.file']`.
+- Verification against real Google OAuth: reauthorizing an existing Google
+  connection with `capability: "drive"` preserved the connection ID,
+  `external_account_id`, and refresh token, and accumulated `drive.file`
+  in the `scopes` array without creating a second connection row.
+- `tests/Unit/Integrations/DriveCapabilityTest.php` — 7 tests / 8 assertions.
+
+## Batch 2 — Gmail attachment reader and Drive file uploader
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `app/Modules/Integrations/Infrastructure/Google/Gmail/GmailAttachmentReader.php`
+- `app/Modules/Integrations/Infrastructure/Google/Drive/GoogleDriveFileUploader.php`
+- `app/Modules/Integrations/Core/Exceptions/DriveProviderException.php`
+- `tests/Unit/Integrations/GmailAttachmentReaderTest.php` — 8 tests / 8 assertions.
+- `tests/Unit/Integrations/GoogleDriveFileUploaderTest.php` — 10 tests / 16 assertions.
+
+## Batch 3 — Attachment materialization and enriched payload
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `app/Modules/Integrations/Infrastructure/Google/Gmail/GmailAttachmentMaterializer.php`
+- `GmailMessagePayloadBuilder::buildWithAttachments()` — new method.
+  `build()` is byte-identical.
+- `tests/Unit/Integrations/GmailAttachmentMaterializerTest.php` — 8 tests / 36 assertions.
+- `tests/Unit/Integrations/GmailMessagePayloadBuilderWithAttachmentsTest.php` — 6 tests / 30 assertions.
+- Partial-failure policy: per-attachment handling, stable error codes
+  `gmail_download_failed` and `drive_upload_failed`, no credentials or
+  provider messages in the payload.
+
+## Batch 4 — New trigger definition and strategy branching
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `GmailIntegration` — second trigger `new_email_received_with_attachment`,
+  `strategy: poll`, `capability: gmail`, `requiredScopes` =
+  `gmail.readonly` + `drive.file`. No configurable `has_attachment` field.
+- `app/Modules/Integrations/Application/Actions/FetchGmailTriggerMessagesWithAttachmentsAction.php`
+- `GmailPollStrategy` — widened trigger-key guard, Drive-scope check with
+  `drive_connection_required` skip, `has:attachment` query append (never
+  duplicated), dispatch to the enriched fetch action.
+- `app/Modules/Integrations/Lang/{en,ar}/catalog.php` — translation entries.
+- `tests/Unit/Integrations/GmailIntegrationAttachmentTriggerTest.php` — 5 tests / 22 assertions.
+- `tests/Unit/Integrations/FetchGmailTriggerMessagesWithAttachmentsActionTest.php` — 2 tests / 5 assertions.
+- `tests/Unit/Execution/GmailPollStrategyBranchTest.php` — 10 tests / 21 assertions.
+- `tests/Unit/Integrations/IntegrationCatalogTest.php` — one-line assertion
+  update to reflect the second Gmail trigger.
+
+## Batch 5 — Activation validation
+
+Status: `COMPLETE` (verification-only; no production change).
+
+The activation requirement is enforced by the existing
+`WorkflowCapabilityValidator`, because the attachment trigger declares
+`drive.file` in `requiredScopes`. A workflow whose trigger is
+`new_email_received_with_attachment` and whose connection lacks the Drive
+scope returns HTTP 409 with `error: "missing_scopes"` and the missing scope
+URI in `context.missing_scopes`. No separate validator was introduced.
+
+Deliverables:
+
+- `tests/Feature/Automation/GmailAttachmentTriggerActivationTest.php` — 4 tests / 14 assertions.
+
+## Batch 6 — Mobile contract and verification
+
+Status: `COMPLETE`.
+
+Deliverables:
+
+- `docs/06_MOBILE_API_CONTRACT.md` — §5.20 documents the trigger, the
+  payload shape, the partial-failure policy, and the Drive-scope
+  requirement.
+- Automated tests as listed in Batch 4 and Batch 5.
+- A combined regression sweep across the ten suites listed under
+  "Test Evidence" below.
+
+## Gmail Attachment Trigger Gate
+
+- [x] Second trigger `new_email_received_with_attachment` present in
+      `GmailIntegration`.
+- [x] Existing `new_email_received` definition byte-identical to pre-feature
+      source.
+- [x] Both trigger keys handled by the single `GmailPollStrategy`.
+- [x] No second poller, scheduler, cursor, or idempotency mechanism.
+- [x] Drive-scope check before any cursor work.
+- [x] `drive_connection_required` skip does not advance the cursor.
+- [x] `has:attachment` appended for the attachment trigger only.
+- [x] `has:attachment` not duplicated when the user query already contains it.
+- [x] Attachment-free messages are skipped by the enriched fetch action.
+- [x] Attachment materialization uses `drive.file` scope only.
+- [x] No public permissions are set on any Drive file.
+- [x] Attachment metadata is exposed as
+      `trigger.attachments[].{gmail_attachment_id, drive_file_id, filename, mime_type, size}`
+      plus an `error` field on failures.
+- [x] Partial-failure policy implemented and tested.
+- [x] Existing 14 trigger payload keys unchanged.
+- [x] Enriched payload flows through the unchanged
+      `RunWorkflowAction::execute()` path.
+- [x] No changes to scheduler, coordinator, execution engine, connections
+      schema, OAuth flow, or Swagger operations.
+- [x] Activation validation reuses `WorkflowCapabilityValidator`.
+- [x] `docs/06_MOBILE_API_CONTRACT.md` documents the feature.
+- [x] Automated tests green as reported under "Test Evidence".
+
+Gmail Attachment Trigger is `COMPLETE (reported)`.
+
+## Test Evidence
+
+The figures below come from terminal output pasted during the implementation
+conversation. They are recorded as the concrete evidence available.
+
+| Suite | Tests | Assertions |
+| --- | --- | --- |
+| `DriveCapabilityTest` | 7 | 8 |
+| `GmailAttachmentReaderTest` | 8 | 8 |
+| `GoogleDriveFileUploaderTest` | 10 | 16 |
+| `GmailAttachmentMaterializerTest` | 8 | 36 |
+| `GmailMessagePayloadBuilderWithAttachmentsTest` | 6 | 30 |
+| `GmailIntegrationAttachmentTriggerTest` | 5 | 22 |
+| `FetchGmailTriggerMessagesWithAttachmentsActionTest` | 2 | 5 |
+| `GmailPollStrategyBranchTest` | 10 | 21 |
+| `GmailAttachmentTriggerActivationTest` | 4 | 14 |
+| Combined regression sweep (ten suites) | 47 | 150 |
+
+The combined sweep is a union of the ten suites named in the sweep command.
+It is not independent of the per-suite figures listed for
+`GmailAttachmentTriggerActivationTest`, `GmailPollStrategyBranchTest`, and
+`IntegrationCatalogTest`, which are among its members. **The per-suite
+figures and the combined sweep figure are not summed.**
+
+## Items carried forward
+
+- Live end-to-end verification of the materialization path against a real
+  Gmail mailbox has not been reported. The automated tests exercise the
+  branching logic, the payload builder, the materializer, the enriched
+  fetch action, and the activation validation; they do not exercise the
+  live Gmail → Drive data path.
+- A downstream action that reads attachment bytes back out of Drive is not
+  implemented. Consuming actions consume `drive_file_id`, not bytes.
+
+---
+
 # Cumulative Test Growth
 
-| Phase / Batch                          | Total Tests | Total Assertions |
-| -------------------------------------- | ----------- | ---------------- |
-| Phase 0 close                          | 26          | 75               |
-| Phase 2 close                          | 52          | 179              |
-| Phase 3 close                          | 84          | 495              |
-| Phase 4 close                          | 99          | 519              |
-| Phase 5 close                          | 293         | 986              |
-| Batch 6.5 close (Phase 6 close)        | 507         | 1486             |
-| Batch 7.1 close                        | 519         | 1512             |
-| Batch 7.2 close                        | 540         | 1576             |
-| Batch 7.3 close                        | 577         | 1670             |
-| Batch 7.4 close                        | 607         | 1749             |
-| Batch 7.5 close (Phase 7 close)        | 607         | 1749             |
-| Phase 8 close                          | 607         | 1749             |
-| Catalog batch close                    | 621         | 1893             |
-| Login API batch close                  | 632         | 1929             |
-| Post-Login full-suite (pre-Path-A)     | 663         | 1963             |
-| Post-Path-A full suite                 | 689         | 2068             |
-| Post scheduler Batches 1–4             | 698         | 2090             |
-| Post scheduler + strategy coverage     | 704         | 2117             |
-| Post scheduler hardening close         | 709         | 2127             |
-| Gmail Integration Completion close     | 752         | 2267             |
-| **Localization + Password Reset**      | **752**     | **2267**         |
+| Phase / Batch                                        | Total Tests | Total Assertions |
+| ---------------------------------------------------- | ----------- | ---------------- |
+| Phase 0 close                                        | 26          | 75               |
+| Phase 2 close                                        | 52          | 179              |
+| Phase 3 close                                        | 84          | 495              |
+| Phase 4 close                                        | 99          | 519              |
+| Phase 5 close                                        | 293         | 986              |
+| Batch 6.5 close (Phase 6 close)                      | 507         | 1486             |
+| Batch 7.1 close                                      | 519         | 1512             |
+| Batch 7.2 close                                      | 540         | 1576             |
+| Batch 7.3 close                                      | 577         | 1670             |
+| Batch 7.4 close                                      | 607         | 1749             |
+| Batch 7.5 close (Phase 7 close)                      | 607         | 1749             |
+| Phase 8 close                                        | 607         | 1749             |
+| Catalog batch close                                  | 621         | 1893             |
+| Login API batch close                                | 632         | 1929             |
+| Post-Login full-suite (pre-Path-A)                   | 663         | 1963             |
+| Post-Path-A full suite                               | 689         | 2068             |
+| Post scheduler Batches 1–4                           | 698         | 2090             |
+| Post scheduler + strategy coverage                   | 704         | 2117             |
+| Post scheduler hardening close                       | 709         | 2127             |
+| Gmail Integration Completion close                   | 752         | 2267             |
+| **Localization + Password Reset + Gmail Attachment Trigger (current)** | **752**     | **2267**         |
 
-**Note:** Localization and Password Reset added new test files that have not
-yet been executed in this environment. The count remains at the last verified
-figure. Once the new tests are run against a dedicated test DB (`:memory:`
-SQLite preferred), the totals must be updated.
+The last verified full-suite run remains **752 passed / 2267 assertions / 0
+failures**. That figure predates the Localization, Password Reset, and Gmail
+Attachment Trigger test files.
 
-New test files written but not yet included in the totals above:
+Test files added since that run, kept separate from the cumulative figure:
 
-- `tests/Feature/Localization/IdentityLocalizationTest.php`
-- `tests/Feature/Localization/IntegrationsLocalizationTest.php`
-- `tests/Feature/Localization/CatalogLocalizationTest.php`
-- `tests/Feature/Identity/PasswordResetTest.php`
+- `tests/Feature/Localization/SetLocaleTest.php` — 6 / 12 (executed; passed).
+- `tests/Feature/Localization/CatalogTranslationParityTest.php` — 2 / 16 (executed; passed).
+- `tests/Feature/Localization/IdentityLocalizationTest.php` — written, not yet folded into a full-suite run.
+- `tests/Feature/Localization/IntegrationsLocalizationTest.php` — written, not yet folded into a full-suite run.
+- `tests/Feature/Localization/CatalogLocalizationTest.php` — written, not yet folded into a full-suite run.
+- `tests/Feature/Identity/PasswordResetTest.php` — written, not yet folded into a full-suite run.
+- Nine Gmail Attachment Trigger test files — see the "Gmail Attachment Trigger → Test Evidence" section. Kept separate from the cumulative row.
 
-Test files executed and already reflected in the current figures:
-
-- `tests/Feature/Localization/SetLocaleTest.php` — 6 / 12
-- `tests/Feature/Localization/CatalogTranslationParityTest.php` — 2 / 16
+`phpunit.xml` is configured with `DB_CONNECTION=sqlite` and
+`DB_DATABASE=:memory:` (verified by the user). Tests that use
+`RefreshDatabase` therefore run against an ephemeral in-memory database.
 
 ---
 
@@ -1159,7 +1334,7 @@ Includes:
 
 ---
 
-# Post-Localization / Post-Password-Reset Deferred Items
+# Post-Localization / Post-Password-Reset / Post-Attachment Deferred Items
 
 These items remain outstanding and are not part of any opened phase.
 
@@ -1171,9 +1346,15 @@ These items remain outstanding and are not part of any opened phase.
 - Master OTP for internal password reset — explicitly rejected.
 - CLI password reset command — proposed but not implemented.
 - Live `missing_scopes` verification against an old-scope-only Google connection.
+- Live end-to-end verification of the `new_email_received_with_attachment`
+  trigger's materialization path against a real Gmail mailbox.
+- A downstream action that reads attachment bytes back out of Drive into a
+  workflow step. Not implemented. Consuming actions consume `drive_file_id`.
 - Optional clean negative-case retest of the `is:unread` filter.
 - Investigation of the scheduler tick unauthenticated response body mismatch.
-- Execution of the newly written Localization and Password Reset test files against a dedicated test DB.
+- Execution of the newly written Localization, Password Reset, and Gmail
+  Attachment Trigger test files against a dedicated test DB or `:memory:`
+  SQLite, and update of the cumulative test count.
 
 ---
 

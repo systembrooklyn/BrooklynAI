@@ -5,6 +5,7 @@ namespace App\Modules\Automation\Application\Actions;
 use App\Modules\Automation\Application\DTOs\WorkflowData;
 use App\Modules\Automation\Application\DTOs\WorkflowIdInput;
 use App\Modules\Automation\Application\Services\WorkflowCapabilityValidator;
+use App\Modules\Automation\Application\Services\WorkflowTriggerActionCompatibilityValidator;
 use App\Modules\Automation\Core\Entities\Workflow;
 use App\Modules\Automation\Core\Entities\WorkflowStep;
 use App\Modules\Automation\Core\Entities\WorkflowTrigger;
@@ -23,6 +24,7 @@ final class ActivateWorkflowAction
         private readonly WorkflowRepository $workflows,
         private readonly IntegrationCatalog $catalog,
         private readonly WorkflowCapabilityValidator $capabilities,
+        private readonly WorkflowTriggerActionCompatibilityValidator $compatibility,
     ) {}
 
     public function execute(WorkflowIdInput $input): WorkflowData
@@ -53,7 +55,7 @@ final class ActivateWorkflowAction
         $this->validateTrigger($trigger, $input->userId);
 
         foreach ($this->workflows->listStepsForWorkflow($input->workflowId) as $step) {
-            $this->validateStep($step, $input->userId);
+            $this->validateStep($step, $input->userId, $trigger);
         }
 
         $updated = new Workflow(
@@ -133,7 +135,7 @@ final class ActivateWorkflowAction
         );
     }
 
-    private function validateStep(WorkflowStep $step, int $userId): void
+    private function validateStep(WorkflowStep $step, int $userId, WorkflowTrigger $trigger): void
     {
         $integration = $this->catalog->find($step->integrationKey);
 
@@ -167,6 +169,14 @@ final class ActivateWorkflowAction
             requiredScopes: $this->scopeValues($definition->requiredScopes),
             connectionId: $step->connectionId,
             userId: $userId,
+        );
+
+        $this->compatibility->validate(
+            location: 'step:'.$step->position,
+            actionIntegrationKey: $step->integrationKey,
+            actionKey: $step->actionKey,
+            triggerIntegrationKey: $trigger->integrationKey,
+            triggerKey: $trigger->triggerKey,
         );
     }
 

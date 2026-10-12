@@ -120,6 +120,28 @@ return [
                     ],
                 ],
             ],
+            'send_attachment_links_email' => [
+                'label' => 'Send Attachment Links Email',
+                'description' => 'Send an email containing a clickable Drive link for each materialized attachment. Only available with the "New Email Received With Attachment" trigger.',
+                'fields' => [
+                    'to' => [
+                        'label' => 'To',
+                        'description' => 'Recipient email address. Typically {{ trigger.from }}.',
+                    ],
+                    'subject' => [
+                        'label' => 'Subject',
+                        'description' => 'Subject of the outgoing email.',
+                    ],
+                    'intro_text' => [
+                        'label' => 'Intro Text',
+                        'description' => 'Optional sentence shown above the list of attachment links.',
+                    ],
+                    'attachments' => [
+                        'label' => 'Attachments',
+                        'description' => 'The attachment metadata from the trigger payload. Leave as {{ trigger.attachments }}.',
+                    ],
+                ],
+            ],
         ],
         'triggers' => [
             'new_email_received' => [
@@ -141,6 +163,28 @@ return [
                     'has_attachment' => [
                         'label' => 'Has Attachment',
                         'description' => 'Only trigger for emails that carry an attachment.',
+                    ],
+                    'query' => [
+                        'label' => 'Advanced Query',
+                        'description' => 'Optional raw Gmail search query, for example "is:unread larger:5M". Advanced users only.',
+                    ],
+                ],
+            ],
+            'new_email_received_with_attachment' => [
+                'label' => 'New Email Received With Attachment',
+                'description' => 'Trigger when a new email with at least one attachment is received.',
+                'fields' => [
+                    'label_id' => [
+                        'label' => 'Label',
+                        'description' => 'Only trigger for emails with this Gmail label. Leave empty to match all mail.',
+                    ],
+                    'from' => [
+                        'label' => 'From',
+                        'description' => 'Only trigger for emails whose sender matches this filter. Uses Gmail search syntax (for example user@example.com).',
+                    ],
+                    'subject' => [
+                        'label' => 'Subject',
+                        'description' => 'Only trigger for emails whose subject matches this filter. Multi-word values are matched as a phrase.',
                     ],
                     'query' => [
                         'label' => 'Advanced Query',

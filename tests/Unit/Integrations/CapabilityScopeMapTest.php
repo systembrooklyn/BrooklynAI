@@ -66,6 +66,6 @@ class CapabilityScopeMapTest extends TestCase
     {
         $map = new CapabilityScopeMap;
 
-        $this->assertSame(['gmail'], $map->capabilities());
+        $this->assertSame(['gmail', 'drive'], $map->capabilities());
     }
 }

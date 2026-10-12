@@ -101,13 +101,17 @@ class IntegrationCatalogTest extends TestCase
                 'mark_as_unread',
                 'remove_label',
                 'reply_to_email',
+                'send_attachment_links_email',
                 'send_email',
                 'trash',
             ],
             $actionKeys,
         );
         $triggerKeys = array_map(static fn($t) => $t->key, $gmail->triggers);
-        $this->assertSame(['new_email_received'], $triggerKeys);
+        $this->assertSame(
+            ['new_email_received', 'new_email_received_with_attachment'],
+            $triggerKeys,
+        );
 
         $this->assertSame('poll', $gmail->triggers[0]->strategy->value);
     }

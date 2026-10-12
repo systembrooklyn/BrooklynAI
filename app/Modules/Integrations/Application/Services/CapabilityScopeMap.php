@@ -36,6 +36,9 @@ final class CapabilityScopeMap
             'https://www.googleapis.com/auth/gmail.modify',
             'https://www.googleapis.com/auth/gmail.labels',
         ],
+        'drive' => [
+            'https://www.googleapis.com/auth/drive.file',
+        ],
     ];
 
     public function has(string $capability): bool

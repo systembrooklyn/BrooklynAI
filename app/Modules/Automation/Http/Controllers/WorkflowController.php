@@ -19,6 +19,7 @@ use App\Modules\Automation\Core\Exceptions\WorkflowCapabilityException;
 use App\Modules\Automation\Core\Exceptions\WorkflowNotFoundException;
 use App\Modules\Automation\Core\Exceptions\WorkflowNotRunnableException;
 use App\Modules\Automation\Core\Exceptions\WorkflowRequiresTriggerException;
+use App\Modules\Automation\Http\Controllers\Concerns\TranslatesCapabilityErrors;
 use App\Modules\Automation\Http\Requests\CreateWorkflowRequest;
 use App\Modules\Automation\Http\Requests\ListWorkflowsRequest;
 use App\Modules\Automation\Http\Requests\UpdateWorkflowRequest;
@@ -27,6 +28,8 @@ use Illuminate\Http\Request;
 
 class WorkflowController extends Controller
 {
+    use TranslatesCapabilityErrors;
+
     public function index(ListWorkflowsRequest $request, ListWorkflowsAction $action): JsonResponse
     {
         $items = $action->execute(new ListWorkflowsInput(
@@ -159,11 +162,7 @@ class WorkflowController extends Controller
                 'message' => __('automation::messages.cannot_activate_without_trigger'),
             ], 409);
         } catch (WorkflowCapabilityException $e) {
-            return response()->json([
-                'message' => __($this->capabilityMessageKey($e->errorCode())),
-                'error' => $e->errorCode(),
-                'context' => $e->context(),
-            ], 409);
+            return $this->capabilityError($e);
         } catch (WorkflowNotRunnableException) {
             return $this->invalidTransition();
         }
@@ -172,20 +171,6 @@ class WorkflowController extends Controller
             'message' => __('automation::messages.activate_success'),
             'data' => $data->toArray(),
         ]);
-    }
-
-    private function capabilityMessageKey(string $errorCode): string
-    {
-        return match ($errorCode) {
-            WorkflowCapabilityException::ERROR_MISSING_CONNECTION => 'automation::messages.capability_missing_connection',
-            WorkflowCapabilityException::ERROR_CONNECTION_NOT_FOUND => 'automation::messages.capability_connection_unavailable',
-            WorkflowCapabilityException::ERROR_UNSUPPORTED_CAPABILITY => 'automation::messages.capability_unsupported',
-            WorkflowCapabilityException::ERROR_MISSING_SCOPES => 'automation::messages.capability_missing_scopes',
-            WorkflowCapabilityException::ERROR_UNKNOWN_INTEGRATION => 'automation::messages.capability_unknown_integration',
-            WorkflowCapabilityException::ERROR_UNKNOWN_TRIGGER => 'automation::messages.capability_unknown_trigger',
-            WorkflowCapabilityException::ERROR_UNKNOWN_ACTION => 'automation::messages.capability_unknown_action',
-            default => 'automation::messages.capability_validation_failed',
-        };
     }
 
     public function pause(Request $request, int $id, PauseWorkflowAction $action): JsonResponse
