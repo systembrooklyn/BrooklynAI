@@ -45,7 +45,8 @@ Password Reset COMPLETE.
 Gmail Attachment Trigger (its own Batches 1ŌĆō6) COMPLETE (reported).
 Gmail Attachment Links Email Action (its own Batches 1ŌĆō2) COMPLETE (reported).
 Live Production Readiness Verification PASS (local + real Gmail/Drive).
-Batches 1ŌĆō2 changes deployed to production at commit <SHA> on <DATE>.
+Batches 1ŌĆō2 changes deployed to production at commit 64ee567 on 2026-10-12.
+Apps Script 5-minute scheduler trigger installed and firing against production.
 No new numbered phase has been opened.
 ```
 
@@ -390,11 +391,13 @@ note.
 
 ## Deployment status
 
-The Batches 1ŌĆō2 changes were deployed to production at commit <SHA> on
-<DATE>. Deployment was verified against the production environment. Live
-scheduler behavior on production is tracked separately under Phase 3 of the
-deployment follow-up; the Apps Script 5-minute trigger status is recorded in
-docs/08_DEPLOYMENT.md ┬º3.
+The Batches 1ŌĆō2 changes were deployed to production at commit 64ee567 on
+2026-10-12. The Apps Script 5-minute time-driven trigger was installed the
+same day. Manual `tick()` against the production endpoint returned
+`{"ok":true,"processed":0,"executed":0,"skipped":0,"failed":0,"lock_held":false}`.
+The first automatic time-driven invocation fired within 3 minutes of install
+and returned a clean response. Automatic polling of the production scheduler
+is live.
 
 ## Not verified by this pass
 
@@ -768,18 +771,18 @@ Executed from Section 1 to Section 12 of the E2E plan.
 
 **Actions verified against a real Gmail account:**
 
-| Action | Result | Evidence |
-| --- | --- | --- |
-| `send_email` | PASS | (verified during prior scheduler hardening) |
-| `reply_to_email` | PASS | Reply visible in the same Gmail thread, real `message_id` returned |
-| `create_draft` | PASS | Draft visible in Gmail Drafts, real `draft_id` and `message_id` returned, destination inbox untouched |
-| `mark_as_read` | PASS | Read state flipped in Gmail UI |
-| `mark_as_unread` | PASS | Unread state flipped in Gmail UI |
-| `archive` | PASS | Message removed from INBOX, still reachable via All Mail |
-| `trash` | PASS | Message present in Trash, not permanently deleted |
-| `add_label` | PASS | Label attached to the message |
-| `remove_label` | PASS | Label removed from the message |
-| `create_label` | PASS | New label appeared in Gmail's label list |
+| Action           | Result | Evidence                                                                                              |
+| ---------------- | ------ | ----------------------------------------------------------------------------------------------------- |
+| `send_email`     | PASS   | (verified during prior scheduler hardening)                                                           |
+| `reply_to_email` | PASS   | Reply visible in the same Gmail thread, real `message_id` returned                                    |
+| `create_draft`   | PASS   | Draft visible in Gmail Drafts, real `draft_id` and `message_id` returned, destination inbox untouched |
+| `mark_as_read`   | PASS   | Read state flipped in Gmail UI                                                                        |
+| `mark_as_unread` | PASS   | Unread state flipped in Gmail UI                                                                      |
+| `archive`        | PASS   | Message removed from INBOX, still reachable via All Mail                                              |
+| `trash`          | PASS   | Message present in Trash, not permanently deleted                                                     |
+| `add_label`      | PASS   | Label attached to the message                                                                         |
+| `remove_label`   | PASS   | Label removed from the message                                                                        |
+| `create_label`   | PASS   | New label appeared in Gmail's label list                                                              |
 
 **Multi-step execution:** A single seven-step workflow exercised
 `create_label` ŌåÆ `add_label` ŌåÆ `mark_as_unread` ŌåÆ `mark_as_read` ŌåÆ
@@ -795,13 +798,13 @@ that inter-step templates work end-to-end.**
 
 **Trigger filters verified:**
 
-| Filter | Positive | Negative |
-| --- | --- | --- |
-| `label_id: "INBOX"` | PASS (implicit in every triggered email) | ŌĆö |
-| `subject` | PASS (positive case verified across multiple workflows) | PASS (implicit ŌĆö no non-matching email ever triggered) |
-| `from` | Not exercised live (requires a second external sender) | Not exercised live |
-| `has_attachment: true` | PASS (email with attachment triggered) | PASS (email without attachment did not trigger) |
-| `query: "is:unread"` | PASS (three consecutive executions confirmed matching) | Not directly demonstrated in the live pass; the filter delegates to Gmail's native `is:unread` operator through the same `q` composer as `has_attachment`, whose negative case WAS verified live |
+| Filter                 | Positive                                                | Negative                                                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `label_id: "INBOX"`    | PASS (implicit in every triggered email)                | ŌĆö                                                                                                                                                                                              |
+| `subject`              | PASS (positive case verified across multiple workflows) | PASS (implicit ŌĆö no non-matching email ever triggered)                                                                                                                                         |
+| `from`                 | Not exercised live (requires a second external sender)  | Not exercised live                                                                                                                                                                               |
+| `has_attachment: true` | PASS (email with attachment triggered)                  | PASS (email without attachment did not trigger)                                                                                                                                                  |
+| `query: "is:unread"`   | PASS (three consecutive executions confirmed matching)  | Not directly demonstrated in the live pass; the filter delegates to Gmail's native `is:unread` operator through the same `q` composer as `has_attachment`, whose negative case WAS verified live |
 
 ### Section 11 ŌĆö Hero test
 
@@ -1470,12 +1473,12 @@ or any API response.
 
 ### Enforcement points
 
-| Boundary | File |
-| --- | --- |
-| Step add | `AddWorkflowStepAction` |
-| Step update | `UpdateWorkflowStepAction` |
+| Boundary                                | File                          |
+| --------------------------------------- | ----------------------------- |
+| Step add                                | `AddWorkflowStepAction`       |
+| Step update                             | `UpdateWorkflowStepAction`    |
 | Trigger upsert (against existing steps) | `UpsertWorkflowTriggerAction` |
-| Activation | `ActivateWorkflowAction` |
+| Activation                              | `ActivateWorkflowAction`      |
 
 All four throw `WorkflowCapabilityException::incompatibleTrigger()` with
 error code `incompatible_trigger` and a `context` payload containing
@@ -1616,30 +1619,30 @@ and `IntegrationCatalogTest`.
 
 # Cumulative Test Growth
 
-| Phase / Batch                                        | Total Tests | Total Assertions |
-| ---------------------------------------------------- | ----------- | ---------------- |
-| Phase 0 close                                        | 26          | 75               |
-| Phase 2 close                                        | 52          | 179              |
-| Phase 3 close                                        | 84          | 495              |
-| Phase 4 close                                        | 99          | 519              |
-| Phase 5 close                                        | 293         | 986              |
-| Batch 6.5 close (Phase 6 close)                      | 507         | 1486             |
-| Batch 7.1 close                                      | 519         | 1512             |
-| Batch 7.2 close                                      | 540         | 1576             |
-| Batch 7.3 close                                      | 577         | 1670             |
-| Batch 7.4 close                                      | 607         | 1749             |
-| Batch 7.5 close (Phase 7 close)                      | 607         | 1749             |
-| Phase 8 close                                        | 607         | 1749             |
-| Catalog batch close                                  | 621         | 1893             |
-| Login API batch close                                | 632         | 1929             |
-| Post-Login full-suite (pre-Path-A)                   | 663         | 1963             |
-| Post-Path-A full suite                               | 689         | 2068             |
-| Post scheduler Batches 1ŌĆō4                           | 698         | 2090             |
-| Post scheduler + strategy coverage                   | 704         | 2117             |
-| Post scheduler hardening close                       | 709         | 2127             |
-| Gmail Integration Completion close                   | 752         | 2267             |
+| Phase / Batch                                                          | Total Tests | Total Assertions |
+| ---------------------------------------------------------------------- | ----------- | ---------------- |
+| Phase 0 close                                                          | 26          | 75               |
+| Phase 2 close                                                          | 52          | 179              |
+| Phase 3 close                                                          | 84          | 495              |
+| Phase 4 close                                                          | 99          | 519              |
+| Phase 5 close                                                          | 293         | 986              |
+| Batch 6.5 close (Phase 6 close)                                        | 507         | 1486             |
+| Batch 7.1 close                                                        | 519         | 1512             |
+| Batch 7.2 close                                                        | 540         | 1576             |
+| Batch 7.3 close                                                        | 577         | 1670             |
+| Batch 7.4 close                                                        | 607         | 1749             |
+| Batch 7.5 close (Phase 7 close)                                        | 607         | 1749             |
+| Phase 8 close                                                          | 607         | 1749             |
+| Catalog batch close                                                    | 621         | 1893             |
+| Login API batch close                                                  | 632         | 1929             |
+| Post-Login full-suite (pre-Path-A)                                     | 663         | 1963             |
+| Post-Path-A full suite                                                 | 689         | 2068             |
+| Post scheduler Batches 1ŌĆō4                                           | 698         | 2090             |
+| Post scheduler + strategy coverage                                     | 704         | 2117             |
+| Post scheduler hardening close                                         | 709         | 2127             |
+| Gmail Integration Completion close                                     | 752         | 2267             |
 | **Localization + Password Reset + Gmail Attachment Trigger (current)** | **752**     | **2267**         |
-| Post-live-verification (verification only; no new tests) | **752** | **2267** |
+| Post-live-verification (verification only; no new tests)               | **752**     | **2267**         |
 
 The last verified full-suite run remains **752 passed / 2267 assertions / 0
 failures**. That figure predates the Localization test files, the Password
@@ -1958,7 +1961,7 @@ Locked unless a new ADR changes them.
 
 # Current Task
 
-```text
+````text
 Phase 0ŌĆō8 and all recorded post-Phase-8 branches are COMPLETE / CLOSED / VERIFIED.
 
 Production Scheduler Hardening Batches 1ŌĆō8 are COMPLETE / VERIFIED.
@@ -1997,10 +2000,10 @@ This count predates the Localization test files, the Password Reset test
 file, the Gmail Attachment Trigger test files, and the Gmail Attachment
 Links Email Action test files.
 
-Batches 1ŌĆō2 changes deployed to production at commit <SHA> on <DATE>.
+Batches 1ŌĆō2 changes deployed to production at commit 64ee567 on 2026-10-12.
+Apps Script 5-minute scheduler trigger installed and firing against production.
 Phase 9 remains LOCKED.
 Phase 10 remains LOCKED.
-```
 
 ---
 
@@ -2036,7 +2039,7 @@ Production deployment follow-up:
 Production-environment verification (env vars, cache store, Apps Script
 ScriptProperties, mail transport, migrate --force, first live tick) is
 required before any deployment.
-```
+````
 
 No cleanup, no refactor, and no new code is authorized by this state file alone.
 

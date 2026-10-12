@@ -35,12 +35,13 @@ Without a working mail transport, the password reset flow silently fails to deli
 
 The production scheduler is driven by Google Apps Script installed as a time-driven trigger.
 
-**Current status (2026-10-12):** the Apps Script project exists with the
-correct Script Properties, but the 5-minute time-driven trigger is **not
-currently installed**. The Triggers page shows "No results". Automation
-therefore relies on manual `POST /api/internal/scheduler/tick` calls until
-the trigger is installed. Installation is a deliberate operator action; see
-the setup steps below.
+**Current status (2026-10-12):** the Apps Script project is configured with
+the correct Script Properties and the 5-minute time-driven trigger is
+**installed**. Verified: manual `tick()` returned `{"ok":true,...}`;
+`installTrigger()` created exactly one trigger (`tick` / Time-driven /
+Minutes timer / Every 5 minutes); the first automatic invocation fired
+within 3 minutes of install and returned a clean response. Automatic polling
+of the production scheduler is live.
 
 Apps Script responsibilities:
 
