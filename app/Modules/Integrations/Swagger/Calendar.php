@@ -12,6 +12,9 @@ class Calendar
         tags: ['Calendar'],
         summary: 'Create a calendar event',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['title', 'start', 'end'],
             properties: [
@@ -46,6 +49,7 @@ class Calendar
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
@@ -65,6 +69,7 @@ class Calendar
         parameters: [
             new OA\Parameter(name: 'eventId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
@@ -83,6 +88,7 @@ class Calendar
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'eventId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['title', 'start', 'end'],
@@ -114,6 +120,7 @@ class Calendar
         parameters: [
             new OA\Parameter(name: 'eventId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),

@@ -55,6 +55,7 @@ class Execution
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(
             properties: [
@@ -100,6 +101,7 @@ class Execution
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 50)),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(
@@ -122,6 +124,7 @@ class Execution
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(

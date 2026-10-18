@@ -27,6 +27,7 @@
                     {
                         "name": "trashed",
                         "in": "query",
+                        "description": "Filter by soft-deleted status. Use `?trashed=true` to list only deleted workflows. Use `?trashed=false` or omit to list active/draft/paused workflows.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -37,6 +38,9 @@
                                 "0"
                             ]
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -77,6 +81,11 @@
                 ],
                 "summary": "Create a workflow in draft state",
                 "operationId": "workflows.create",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -149,6 +158,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -197,6 +209,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -272,6 +287,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -319,6 +337,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -369,6 +390,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -401,14 +425,31 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "oneOf": [
-                                        {
-                                            "$ref": "#/components/schemas/ErrorResponse"
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
                                         },
-                                        {
-                                            "$ref": "#/components/schemas/CapabilityError"
+                                        "error": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "enum": [
+                                                "missing_connection",
+                                                "connection_not_found_or_not_owned",
+                                                "unsupported_capability",
+                                                "missing_scopes",
+                                                "unknown_integration",
+                                                "unknown_trigger",
+                                                "unknown_action",
+                                                "incompatible_trigger"
+                                            ]
+                                        },
+                                        "context": {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "additionalProperties": true
                                         }
-                                    ]
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -436,6 +477,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -489,6 +533,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -555,6 +602,40 @@
                     "404": {
                         "$ref": "#/components/responses/NotFound"
                     },
+                    "409": {
+                        "description": "Trigger/action incompatibility with existing steps",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "enum": [
+                                                "missing_connection",
+                                                "connection_not_found_or_not_owned",
+                                                "unsupported_capability",
+                                                "missing_scopes",
+                                                "unknown_integration",
+                                                "unknown_trigger",
+                                                "unknown_action",
+                                                "incompatible_trigger"
+                                            ]
+                                        },
+                                        "context": {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "additionalProperties": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "$ref": "#/components/responses/ValidationErrorResponse"
                     }
@@ -579,6 +660,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -626,6 +710,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -686,6 +773,40 @@
                     "404": {
                         "$ref": "#/components/responses/NotFound"
                     },
+                    "409": {
+                        "description": "Trigger/action incompatibility with workflow trigger",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "enum": [
+                                                "missing_connection",
+                                                "connection_not_found_or_not_owned",
+                                                "unsupported_capability",
+                                                "missing_scopes",
+                                                "unknown_integration",
+                                                "unknown_trigger",
+                                                "unknown_action",
+                                                "incompatible_trigger"
+                                            ]
+                                        },
+                                        "context": {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "additionalProperties": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "$ref": "#/components/responses/ValidationErrorResponse"
                     }
@@ -720,6 +841,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -778,6 +902,40 @@
                     "404": {
                         "$ref": "#/components/responses/NotFound"
                     },
+                    "409": {
+                        "description": "Trigger/action incompatibility with workflow trigger",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "enum": [
+                                                "missing_connection",
+                                                "connection_not_found_or_not_owned",
+                                                "unsupported_capability",
+                                                "missing_scopes",
+                                                "unknown_integration",
+                                                "unknown_trigger",
+                                                "unknown_action",
+                                                "incompatible_trigger"
+                                            ]
+                                        },
+                                        "context": {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "additionalProperties": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "$ref": "#/components/responses/ValidationErrorResponse"
                     }
@@ -810,6 +968,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -849,6 +1010,11 @@
                 ],
                 "summary": "List user-owned connections",
                 "operationId": "connections.list",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -889,6 +1055,14 @@
                 ],
                 "summary": "Begin Google OAuth for a capability",
                 "operationId": "connections.startGoogle",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    },
+                    {
+                        "$ref": "#/components/parameters/XClientPlatform"
+                    }
+                ],
                 "requestBody": {
                     "required": false,
                     "content": {
@@ -952,6 +1126,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -1034,6 +1211,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -1153,6 +1333,9 @@
                             "maximum": 50,
                             "minimum": 1
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -1206,6 +1389,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -1249,6 +1435,11 @@
                 "summary": "Register or update a user",
                 "description": "Creates a user if the email is new, otherwise updates access_expiry and has_bot_access.",
                 "operationId": "auth.register",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1337,8 +1528,13 @@
                     "Authentication"
                 ],
                 "summary": "Authenticate with email and password",
-                "description": "Verifies credentials and returns a Sanctum bearer token. Returns the same 401 body for every credential failure (unknown email, wrong password, soft-deleted user, or user without a usable password).",
+                "description": "Verifies credentials and returns a Sanctum bearer token. Returns the same 401 body for every credential failure. Rate-limited to 5 attempts per email+IP per minute. During the migration phase, the server may also accept an operator-configured master password for existing users without a usable password.",
                 "operationId": "auth.login",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1409,6 +1605,22 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationErrorResponse"
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Too many attempts. Please try again later."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1421,6 +1633,11 @@
                 "summary": "Request a password reset code",
                 "description": "Sends a 6-digit OTP to the given email address if it belongs to an existing user. The response is identical for known and unknown emails to prevent email enumeration. The code expires in 15 minutes. Rate limited to 5 requests per email per hour and 20 requests per IP per hour.",
                 "operationId": "auth.password.forgot",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1488,6 +1705,11 @@
                 "summary": "Reset password with OTP code",
                 "description": "Verifies the 6-digit OTP and sets the new password. On success, all existing Sanctum tokens for the user are revoked. Returns a single generic 422 for every failure mode (missing code, expired code, used code, wrong code, or attempts exhausted). Rate limited to 20 requests per email per hour and 60 requests per IP per hour.",
                 "operationId": "auth.password.reset",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1580,6 +1802,11 @@
                 ],
                 "summary": "Get the authenticated user",
                 "operationId": "auth.user",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1697,6 +1924,11 @@
                 ],
                 "summary": "Revoke all Sanctum tokens for the authenticated user",
                 "operationId": "auth.logout",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1731,6 +1963,11 @@
                 ],
                 "summary": "Soft-delete the authenticated user and revoke tokens",
                 "operationId": "auth.deactivate",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": false,
                     "content": {
@@ -1789,6 +2026,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -1827,6 +2067,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -1908,6 +2151,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -1946,6 +2192,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -2019,6 +2268,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -2057,6 +2309,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -2085,6 +2340,11 @@
                 ],
                 "summary": "Create a calendar event",
                 "operationId": "calendar.create",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -2194,6 +2454,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -2230,6 +2493,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -2320,6 +2586,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -2349,8 +2618,13 @@
                     "Catalog"
                 ],
                 "summary": "Retrieve the automation catalog",
-                "description": "Read-only, code-defined discovery of integrations, triggers, actions, capabilities, and configuration metadata. Uses the same canonical identifiers as the Workflow APIs.",
+                "description": "Read-only, code-defined discovery of integrations, triggers, actions, capabilities, and configuration metadata. Uses the same canonical identifiers as the Workflow APIs. Response labels and descriptions are localized based on the Accept-Language header.",
                 "operationId": "catalog.show",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2396,6 +2670,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -2424,6 +2701,11 @@
                 ],
                 "summary": "Create a Google Doc",
                 "operationId": "docs.create",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": false,
                     "content": {
@@ -2476,6 +2758,11 @@
                 ],
                 "summary": "Create a document from a template",
                 "operationId": "docs.generate",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -2541,6 +2828,11 @@
                 ],
                 "summary": "Generate a PDF from a template and email it via Gmail",
                 "operationId": "docs.generateAndEmail",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -2632,6 +2924,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -2686,6 +2981,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -2722,6 +3020,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -2783,6 +3084,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -2852,6 +3156,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -2882,6 +3189,11 @@
                 ],
                 "summary": "Send an email via Gmail",
                 "operationId": "gmail.send",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -2981,6 +3293,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -3037,6 +3352,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -3083,6 +3401,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -3116,6 +3437,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -3178,6 +3502,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -3254,6 +3581,9 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "responses": {
@@ -3290,6 +3620,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -3356,6 +3689,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -3422,6 +3758,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -3482,6 +3821,9 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#/components/parameters/AcceptLanguage"
                     }
                 ],
                 "requestBody": {
@@ -4093,70 +4435,6 @@
                     }
                 },
                 "type": "object"
-            },
-            "ErrorResponse": {
-                "description": "Generic error response.",
-                "required": [
-                    "message"
-                ],
-                "properties": {
-                    "message": {
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
-            "ValidationError": {
-                "description": "Laravel FormRequest validation failure (HTTP 422).",
-                "required": [
-                    "message",
-                    "errors"
-                ],
-                "properties": {
-                    "message": {
-                        "type": "string"
-                    },
-                    "errors": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                },
-                "type": "object"
-            },
-            "CapabilityError": {
-                "description": "Workflow activation capability validation failure (HTTP 409).",
-                "required": [
-                    "message",
-                    "error",
-                    "context"
-                ],
-                "properties": {
-                    "message": {
-                        "type": "string"
-                    },
-                    "error": {
-                        "type": "string",
-                        "enum": [
-                            "missing_connection",
-                            "connection_not_found_or_not_owned",
-                            "unsupported_capability",
-                            "missing_scopes",
-                            "unknown_integration",
-                            "unknown_trigger",
-                            "unknown_action"
-                        ]
-                    },
-                    "context": {
-                        "type": "object",
-                        "additionalProperties": true
-                    }
-                },
-                "type": "object"
             }
         },
         "responses": {
@@ -4165,7 +4443,13 @@
                 "content": {
                     "application/json": {
                         "schema": {
-                            "$ref": "#/components/schemas/ErrorResponse"
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Unauthenticated."
+                                }
+                            },
+                            "type": "object"
                         }
                     }
                 }
@@ -4175,7 +4459,13 @@
                 "content": {
                     "application/json": {
                         "schema": {
-                            "$ref": "#/components/schemas/ErrorResponse"
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Resource not found."
+                                }
+                            },
+                            "type": "object"
                         }
                     }
                 }
@@ -4185,7 +4475,22 @@
                 "content": {
                     "application/json": {
                         "schema": {
-                            "$ref": "#/components/schemas/ValidationError"
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "The given data was invalid."
+                                },
+                                "errors": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "type": "object"
                         }
                     }
                 }
@@ -4195,9 +4500,44 @@
                 "content": {
                     "application/json": {
                         "schema": {
-                            "$ref": "#/components/schemas/ErrorResponse"
+                            "properties": {
+                                "message": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
                         }
                     }
+                }
+            }
+        },
+        "parameters": {
+            "AcceptLanguage": {
+                "name": "Accept-Language",
+                "in": "header",
+                "description": "Preferred response language. Supported: `en`, `ar`. Default: `en`.",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "default": "en",
+                    "enum": [
+                        "en",
+                        "ar"
+                    ]
+                }
+            },
+            "XClientPlatform": {
+                "name": "X-Client-Platform",
+                "in": "header",
+                "description": "Client platform initiating the request. Determines OAuth redirect routing. Supported: `web`, `mobile`. Default: `web`.",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "default": "web",
+                    "enum": [
+                        "web",
+                        "mobile"
+                    ]
                 }
             }
         },

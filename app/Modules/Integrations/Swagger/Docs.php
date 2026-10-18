@@ -14,6 +14,7 @@ class Docs
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
@@ -30,6 +31,9 @@ class Docs
         tags: ['Docs'],
         summary: 'Create a Google Doc',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'title', type: 'string', nullable: true, maxLength: 255),
@@ -52,6 +56,9 @@ class Docs
         tags: ['Docs'],
         summary: 'Create a document from a template',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['name', 'service', 'sign'],
             properties: [
@@ -78,6 +85,9 @@ class Docs
         tags: ['Docs'],
         summary: 'Generate a PDF from a template and email it via Gmail',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['to', 'subject', 'data'],
             properties: [
@@ -108,6 +118,7 @@ class Docs
         parameters: [
             new OA\Parameter(name: 'documentId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'PDF binary', content: new OA\MediaType(
@@ -130,6 +141,7 @@ class Docs
         parameters: [
             new OA\Parameter(name: 'documentId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
@@ -148,6 +160,7 @@ class Docs
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'documentId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['text'],
@@ -174,6 +187,7 @@ class Docs
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'documentId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['content'],
@@ -201,6 +215,7 @@ class Docs
         parameters: [
             new OA\Parameter(name: 'documentId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),

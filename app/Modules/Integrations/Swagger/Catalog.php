@@ -112,8 +112,11 @@ class Catalog
         operationId: 'catalog.show',
         tags: ['Catalog'],
         summary: 'Retrieve the automation catalog',
-        description: 'Read-only, code-defined discovery of integrations, triggers, actions, capabilities, and configuration metadata. Uses the same canonical identifiers as the Workflow APIs.',
+        description: 'Read-only, code-defined discovery of integrations, triggers, actions, capabilities, and configuration metadata. Uses the same canonical identifiers as the Workflow APIs. Response labels and descriptions are localized based on the Accept-Language header.',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(
                 properties: [

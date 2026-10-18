@@ -22,6 +22,9 @@ class Gmail
         tags: ['Gmail'],
         summary: 'Send an email via Gmail',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['to', 'subject', 'body'],
             properties: [
@@ -56,6 +59,7 @@ class Gmail
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(

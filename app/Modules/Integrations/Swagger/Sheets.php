@@ -14,6 +14,7 @@ class Sheets
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
@@ -33,6 +34,7 @@ class Sheets
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
@@ -50,6 +52,7 @@ class Sheets
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['title'],
@@ -76,6 +79,7 @@ class Sheets
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['sheet_id'],
@@ -103,6 +107,7 @@ class Sheets
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'range', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
@@ -121,6 +126,7 @@ class Sheets
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['range', 'values'],
@@ -147,6 +153,7 @@ class Sheets
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['range', 'values'],
@@ -173,6 +180,7 @@ class Sheets
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['range'],
@@ -198,6 +206,7 @@ class Sheets
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'spreadsheetId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['sheet_name', 'data'],

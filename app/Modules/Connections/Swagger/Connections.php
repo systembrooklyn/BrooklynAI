@@ -28,6 +28,9 @@ class Connections
         tags: ['Connections'],
         summary: 'List user-owned connections',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(
                 properties: [
@@ -46,6 +49,10 @@ class Connections
         tags: ['Connections'],
         summary: 'Begin Google OAuth for a capability',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+            new OA\Parameter(ref: '#/components/parameters/XClientPlatform'),
+        ],
         requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'capability', type: 'string', nullable: true, example: 'gmail'),
@@ -69,6 +76,7 @@ class Connections
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'connection', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(

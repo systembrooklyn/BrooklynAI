@@ -60,7 +60,14 @@ class Automation
         summary: 'List workflows',
         security: [['bearerAuth' => []]],
         parameters: [
-            new OA\Parameter(name: 'trashed', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['true', 'false', '1', '0'])),
+            new OA\Parameter(
+                name: 'trashed',
+                in: 'query',
+                required: false,
+                description: 'Filter by soft-deleted status. Use `?trashed=true` to list only deleted workflows. Use `?trashed=false` or omit to list active/draft/paused workflows.',
+                schema: new OA\Schema(type: 'string', enum: ['true', 'false', '1', '0'])
+            ),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(
@@ -80,6 +87,9 @@ class Automation
         tags: ['Workflows'],
         summary: 'Create a workflow in draft state',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['name'],
             properties: [
@@ -108,6 +118,7 @@ class Automation
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(
@@ -130,6 +141,7 @@ class Automation
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['name'],
@@ -160,6 +172,7 @@ class Automation
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(
@@ -179,6 +192,7 @@ class Automation
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(
@@ -201,6 +215,7 @@ class Automation
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Activated', content: new OA\JsonContent(
@@ -212,9 +227,10 @@ class Automation
             new OA\Response(response: 401, ref: '#/components/responses/Unauthorized'),
             new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
             new OA\Response(response: 409, description: 'Cannot activate (missing trigger, invalid transition, or capability failure)', content: new OA\JsonContent(
-                oneOf: [
-                    new OA\Schema(ref: '#/components/schemas/ErrorResponse'),
-                    new OA\Schema(ref: '#/components/schemas/CapabilityError'),
+                properties: [
+                    new OA\Property(property: 'message', type: 'string'),
+                    new OA\Property(property: 'error', type: 'string', nullable: true, enum: ['missing_connection', 'connection_not_found_or_not_owned', 'unsupported_capability', 'missing_scopes', 'unknown_integration', 'unknown_trigger', 'unknown_action', 'incompatible_trigger']),
+                    new OA\Property(property: 'context', type: 'object', nullable: true, additionalProperties: true),
                 ],
             )),
         ],
@@ -229,6 +245,7 @@ class Automation
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Paused', content: new OA\JsonContent(
@@ -252,6 +269,7 @@ class Automation
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['integration_key', 'trigger_key'],
@@ -272,6 +290,13 @@ class Automation
             )),
             new OA\Response(response: 401, ref: '#/components/responses/Unauthorized'),
             new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
+            new OA\Response(response: 409, description: 'Trigger/action incompatibility with existing steps', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string'),
+                    new OA\Property(property: 'error', type: 'string', nullable: true, enum: ['missing_connection', 'connection_not_found_or_not_owned', 'unsupported_capability', 'missing_scopes', 'unknown_integration', 'unknown_trigger', 'unknown_action', 'incompatible_trigger']),
+                    new OA\Property(property: 'context', type: 'object', nullable: true, additionalProperties: true),
+                ],
+            )),
             new OA\Response(response: 422, ref: '#/components/responses/ValidationErrorResponse'),
         ],
     )]
@@ -285,6 +310,7 @@ class Automation
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Deleted', content: new OA\JsonContent(
@@ -304,6 +330,7 @@ class Automation
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['integration_key', 'action_key'],
@@ -323,6 +350,13 @@ class Automation
             )),
             new OA\Response(response: 401, ref: '#/components/responses/Unauthorized'),
             new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
+            new OA\Response(response: 409, description: 'Trigger/action incompatibility with workflow trigger', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string'),
+                    new OA\Property(property: 'error', type: 'string', nullable: true, enum: ['missing_connection', 'connection_not_found_or_not_owned', 'unsupported_capability', 'missing_scopes', 'unknown_integration', 'unknown_trigger', 'unknown_action', 'incompatible_trigger']),
+                    new OA\Property(property: 'context', type: 'object', nullable: true, additionalProperties: true),
+                ],
+            )),
             new OA\Response(response: 422, ref: '#/components/responses/ValidationErrorResponse'),
         ],
     )]
@@ -337,6 +371,7 @@ class Automation
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'position', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
             required: ['integration_key', 'action_key'],
@@ -356,6 +391,13 @@ class Automation
             )),
             new OA\Response(response: 401, ref: '#/components/responses/Unauthorized'),
             new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
+            new OA\Response(response: 409, description: 'Trigger/action incompatibility with workflow trigger', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string'),
+                    new OA\Property(property: 'error', type: 'string', nullable: true, enum: ['missing_connection', 'connection_not_found_or_not_owned', 'unsupported_capability', 'missing_scopes', 'unknown_integration', 'unknown_trigger', 'unknown_action', 'incompatible_trigger']),
+                    new OA\Property(property: 'context', type: 'object', nullable: true, additionalProperties: true),
+                ],
+            )),
             new OA\Response(response: 422, ref: '#/components/responses/ValidationErrorResponse'),
         ],
     )]
@@ -370,6 +412,7 @@ class Automation
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'position', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Deleted', content: new OA\JsonContent(

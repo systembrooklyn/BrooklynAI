@@ -12,6 +12,9 @@ class Identity
         tags: ['Authentication'],
         summary: 'Register or update a user',
         description: 'Creates a user if the email is new, otherwise updates access_expiry and has_bot_access.',
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -48,7 +51,10 @@ class Identity
         operationId: 'auth.login',
         tags: ['Authentication'],
         summary: 'Authenticate with email and password',
-        description: 'Verifies credentials and returns a Sanctum bearer token. Returns the same 401 body for every credential failure (unknown email, wrong password, soft-deleted user, or user without a usable password).',
+        description: 'Verifies credentials and returns a Sanctum bearer token. Returns the same 401 body for every credential failure. Rate-limited to 5 attempts per email+IP per minute. During the migration phase, the server may also accept an operator-configured master password for existing users without a usable password.',
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -75,6 +81,11 @@ class Identity
                 ],
             )),
             new OA\Response(response: 422, ref: '#/components/responses/ValidationErrorResponse'),
+            new OA\Response(response: 429, description: 'Too many attempts', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Too many attempts. Please try again later.'),
+                ],
+            )),
         ],
     )]
     public function login(): void {}
@@ -85,6 +96,9 @@ class Identity
         tags: ['Authentication'],
         summary: 'Request a password reset code',
         description: 'Sends a 6-digit OTP to the given email address if it belongs to an existing user. The response is identical for known and unknown emails to prevent email enumeration. The code expires in 15 minutes. Rate limited to 5 requests per email per hour and 20 requests per IP per hour.',
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -116,6 +130,9 @@ class Identity
         tags: ['Authentication'],
         summary: 'Reset password with OTP code',
         description: 'Verifies the 6-digit OTP and sets the new password. On success, all existing Sanctum tokens for the user are revoked. Returns a single generic 422 for every failure mode (missing code, expired code, used code, wrong code, or attempts exhausted). Rate limited to 20 requests per email per hour and 60 requests per IP per hour.',
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -153,6 +170,9 @@ class Identity
         tags: ['Authentication'],
         summary: 'Get the authenticated user',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(
                 properties: [
@@ -213,6 +233,9 @@ class Identity
         tags: ['Authentication'],
         summary: 'Revoke all Sanctum tokens for the authenticated user',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'OK', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'message', type: 'string')],
@@ -228,6 +251,9 @@ class Identity
         tags: ['Authentication'],
         summary: 'Soft-delete the authenticated user and revoke tokens',
         security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
+        ],
         requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(
             properties: [new OA\Property(property: 'reason', type: 'string', nullable: true)],
         )),

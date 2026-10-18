@@ -18,6 +18,22 @@ use OpenApi\Attributes as OA;
     bearerFormat: 'Sanctum',
     description: 'Laravel Sanctum personal access token. Send as `Authorization: Bearer <token>`.',
 )]
+#[OA\Parameter(
+    parameter: 'AcceptLanguage',
+    name: 'Accept-Language',
+    in: 'header',
+    required: false,
+    description: 'Preferred response language. Supported: `en`, `ar`. Default: `en`.',
+    schema: new OA\Schema(type: 'string', enum: ['en', 'ar'], default: 'en'),
+)]
+#[OA\Parameter(
+    parameter: 'XClientPlatform',
+    name: 'X-Client-Platform',
+    in: 'header',
+    required: false,
+    description: 'Client platform initiating the request. Determines OAuth redirect routing. Supported: `web`, `mobile`. Default: `web`.',
+    schema: new OA\Schema(type: 'string', enum: ['web', 'mobile'], default: 'web'),
+)]
 #[OA\Tag(name: 'Authentication', description: 'User registration and Sanctum-authenticated identity')]
 #[OA\Tag(name: 'Connections', description: 'User-owned Google OAuth connections')]
 #[OA\Tag(name: 'Workflows', description: 'Workflow lifecycle: CRUD, restore, activate, pause')]
@@ -57,7 +73,7 @@ use OpenApi\Attributes as OA;
 )]
 #[OA\Schema(
     schema: 'CapabilityError',
-    description: 'Workflow activation capability validation failure (HTTP 409).',
+    description: 'Workflow capability or compatibility validation failure (HTTP 409).',
     required: ['message', 'error', 'context'],
     properties: [
         new OA\Property(property: 'message', type: 'string'),
@@ -72,6 +88,7 @@ use OpenApi\Attributes as OA;
                 'unknown_integration',
                 'unknown_trigger',
                 'unknown_action',
+                'incompatible_trigger',
             ],
         ),
         new OA\Property(property: 'context', type: 'object', additionalProperties: true),
@@ -81,21 +98,49 @@ use OpenApi\Attributes as OA;
 #[OA\Response(
     response: 'Unauthorized',
     description: 'Unauthenticated.',
-    content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse'),
+    content: new OA\JsonContent(
+        properties: [
+            new OA\Property(property: 'message', type: 'string', example: 'Unauthenticated.'),
+        ],
+        type: 'object',
+    ),
 )]
 #[OA\Response(
     response: 'NotFound',
     description: 'Resource not found or not owned by the current user.',
-    content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse'),
+    content: new OA\JsonContent(
+        properties: [
+            new OA\Property(property: 'message', type: 'string', example: 'Resource not found.'),
+        ],
+        type: 'object',
+    ),
 )]
 #[OA\Response(
     response: 'ValidationErrorResponse',
     description: 'Validation failed.',
-    content: new OA\JsonContent(ref: '#/components/schemas/ValidationError'),
+    content: new OA\JsonContent(
+        properties: [
+            new OA\Property(property: 'message', type: 'string', example: 'The given data was invalid.'),
+            new OA\Property(
+                property: 'errors',
+                type: 'object',
+                additionalProperties: new OA\AdditionalProperties(
+                    type: 'array',
+                    items: new OA\Items(type: 'string'),
+                ),
+            ),
+        ],
+        type: 'object',
+    ),
 )]
 #[OA\Response(
     response: 'GenericError',
     description: 'Generic error.',
-    content: new OA\JsonContent(ref: '#/components/schemas/ErrorResponse'),
+    content: new OA\JsonContent(
+        properties: [
+            new OA\Property(property: 'message', type: 'string'),
+        ],
+        type: 'object',
+    ),
 )]
 class OpenApi {}

@@ -14,6 +14,7 @@ class Analytics
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
@@ -32,6 +33,7 @@ class Analytics
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'propertyId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(
             properties: [
@@ -61,6 +63,7 @@ class Analytics
         parameters: [
             new OA\Parameter(name: 'propertyId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
@@ -79,6 +82,7 @@ class Analytics
         security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'propertyId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(
             properties: [
@@ -106,6 +110,7 @@ class Analytics
         parameters: [
             new OA\Parameter(name: 'propertyId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'connection_id', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
         responses: [
             new OA\Response(response: 200, description: 'OK'),
