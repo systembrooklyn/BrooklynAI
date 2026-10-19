@@ -25,8 +25,8 @@ class GoogleOAuthClient implements OAuthGateway
             'scope' => implode(' ', $scopes),
             'state' => $state,
             'access_type' => 'offline',
-            // 'prompt' => 'select_account',
-            'prompt' => 'consent select_account',
+            'prompt' => 'select_account',
+            // 'prompt' => 'consent select_account',
             'include_granted_scopes' => 'true',
         ];
 
