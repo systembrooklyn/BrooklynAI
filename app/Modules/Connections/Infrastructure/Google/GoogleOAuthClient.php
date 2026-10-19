@@ -25,11 +25,12 @@ class GoogleOAuthClient implements OAuthGateway
             'scope' => implode(' ', $scopes),
             'state' => $state,
             'access_type' => 'offline',
-            'prompt' => 'select_account',
+            // 'prompt' => 'select_account',
+            'prompt' => 'consent select_account',
             'include_granted_scopes' => 'true',
         ];
 
-        return self::AUTHORIZE_ENDPOINT.'?'.http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+        return self::AUTHORIZE_ENDPOINT . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986);
     }
 
     public function exchangeAuthorizationCode(string $code): array
@@ -64,7 +65,7 @@ class GoogleOAuthClient implements OAuthGateway
         $scopeString = is_string($tokenInfo['scope'] ?? null) ? $tokenInfo['scope'] : '';
         $scopes = array_values(array_filter(
             preg_split('/\s+/', trim($scopeString)) ?: [],
-            static fn ($s) => $s !== ''
+            static fn($s) => $s !== ''
         ));
 
         $email = null;

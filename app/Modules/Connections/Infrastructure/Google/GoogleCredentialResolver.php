@@ -174,14 +174,27 @@ class GoogleCredentialResolver implements GoogleCredentialsResolver
         return $response;
     }
 
-    /**
-     * @return array{access_token: string, expires_in?: int, refresh_token?: string}
-     */
+    // /**
+    //  * @return array{access_token: string, expires_in?: int, refresh_token?: string}
+    //  */
+    // protected function refreshWithGoogle(string $refreshToken): array
+    // {
+    //     $client = new GoogleClient;
+    //     $client->setClientId((string) env('GOOGLE_CLIENT_ID'));
+    //     $client->setClientSecret((string) env('GOOGLE_CLIENT_SECRET'));
+    //     $client->setAccessType('offline');
+
+    //     $response = $client->fetchAccessTokenWithRefreshToken($refreshToken);
+
+    //     return is_array($response) ? $response : [];
+    // }
+
     protected function refreshWithGoogle(string $refreshToken): array
     {
         $client = new GoogleClient;
-        $client->setClientId((string) env('GOOGLE_CLIENT_ID'));
-        $client->setClientSecret((string) env('GOOGLE_CLIENT_SECRET'));
+        // Change from env() to config()
+        $client->setClientId((string) config('services.google.client_id'));
+        $client->setClientSecret((string) config('services.google.client_secret'));
         $client->setAccessType('offline');
 
         $response = $client->fetchAccessTokenWithRefreshToken($refreshToken);
@@ -196,7 +209,7 @@ class GoogleCredentialResolver implements GoogleCredentialsResolver
     {
         $expiresIn = (int) ($token['expires_in'] ?? 3600);
 
-        return (new DateTimeImmutable)->modify('+'.$expiresIn.' seconds');
+        return (new DateTimeImmutable)->modify('+' . $expiresIn . ' seconds');
     }
 
     private function normalizeToken(mixed $value): ?string
