@@ -46,21 +46,21 @@ final class StartGoogleConnectionAction
 
         $this->states->save($state);
 
-        // Determine if we need to force consent
+        // Default to smooth UX (account picker only)
         $prompt = 'select_account';
+
         $existingConnections = $this->connections->listForUser($userId);
 
         foreach ($existingConnections as $connection) {
-            if ($connection->provider === self::PROVIDER && $connection->credentials->refreshToken !== null) {
-                // User already has a valid refresh token. No need to force consent.
-                $prompt = 'select_account';
-                break;
-            } else {
-                // No valid refresh token found. Force consent to get one.
+            // If ANY existing Google connection is missing a refresh token,
+            // we must force the consent screen to acquire a new one.
+            if ($connection->provider === self::PROVIDER && $connection->credentials->refreshToken === null) {
                 $prompt = 'consent';
+                break;
             }
         }
 
-        return $this->google->buildAuthorizationUrl($state->state, $scopes);
+        // CRITICAL FIX: Pass the $prompt variable into the method!
+        return $this->google->buildAuthorizationUrl($state->state, $scopes, $prompt);
     }
 }
