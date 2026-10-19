@@ -16,7 +16,7 @@ class GoogleOAuthClient implements OAuthGateway
 
     private const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/userinfo';
 
-    public function buildAuthorizationUrl(string $state, array $scopes): string
+    public function buildAuthorizationUrl(string $state, array $scopes, string $prompt = 'select_account'): string
     {
         $params = [
             'client_id' => (string) config('services.google.client_id'),
@@ -25,8 +25,9 @@ class GoogleOAuthClient implements OAuthGateway
             'scope' => implode(' ', $scopes),
             'state' => $state,
             'access_type' => 'offline',
-            'prompt' => 'select_account',
+            // 'prompt' => 'select_account',
             // 'prompt' => 'consent select_account',
+            'prompt' => $prompt,
             'include_granted_scopes' => 'true',
         ];
 
