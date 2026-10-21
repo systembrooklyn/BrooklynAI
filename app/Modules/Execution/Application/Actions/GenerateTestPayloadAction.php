@@ -40,9 +40,13 @@ final class GenerateTestPayloadAction
 
         $credentials = $this->credentials->resolve($userId, $trigger->connectionId);
 
+        // Only look at emails from the last 10 minutes to accurately simulate "new" emails
+        $afterEpochSeconds = (new \DateTimeImmutable)->modify('-10 minutes')->getTimestamp();
+
+        // If the trigger requires attachments, ensure the test email has one
         $query = $trigger->triggerKey === 'new_email_received_with_attachment' ? 'has:attachment' : null;
 
-        $messageIds = $this->reader->listMessageIds($credentials, 0, [], $query, 1);
+        $messageIds = $this->reader->listMessageIds($credentials, $afterEpochSeconds, [], $query, 1);
 
         if (empty($messageIds)) {
             if ($query === 'has:attachment') {

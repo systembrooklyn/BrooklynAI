@@ -38,7 +38,7 @@ final class TestEmailUnavailableException extends RuntimeException
         return new self(
             self::ERROR_NO_EMAILS,
             ['requires_attachment' => false],
-            'No emails found in the connected Gmail account to use for testing. Please send an email first.',
+            'No recent emails found in the connected Gmail account. Please send a new email to test this workflow.',
         );
     }
 
@@ -47,7 +47,7 @@ final class TestEmailUnavailableException extends RuntimeException
         return new self(
             self::ERROR_NO_EMAILS_WITH_ATTACHMENTS,
             ['requires_attachment' => true],
-            'No emails with attachments found in the connected Gmail account. Please send an email with an attachment to test this workflow.',
+            'No recent emails with attachments found in the connected Gmail account. Please send a new email with an attachment to test this workflow.',
         );
     }
 }
