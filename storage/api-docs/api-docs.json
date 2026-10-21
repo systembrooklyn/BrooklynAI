@@ -1318,7 +1318,55 @@
                         }
                     },
                     "422": {
-                        "$ref": "#/components/responses/ValidationErrorResponse"
+                        "description": "Validation failed, or no test email available.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string"
+                                                },
+                                                "errors": {
+                                                    "type": "object",
+                                                    "additionalProperties": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string"
+                                                },
+                                                "error": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "no_test_email_available",
+                                                        "no_test_email_with_attachments_available"
+                                                    ]
+                                                },
+                                                "context": {
+                                                    "properties": {
+                                                        "requires_attachment": {
+                                                            "type": "boolean"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [

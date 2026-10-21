@@ -15,6 +15,7 @@ use App\Modules\Execution\Core\Exceptions\ExecutionAlreadyRunningException;
 use App\Modules\Execution\Core\Exceptions\WorkflowNotExecutableException;
 use App\Modules\Execution\Http\Requests\ListExecutionsRequest;
 use App\Modules\Execution\Http\Requests\RunWorkflowRequest;
+use App\Modules\Execution\Core\Exceptions\TestEmailUnavailableException;
 use Illuminate\Http\JsonResponse;
 
 class WorkflowExecutionController extends Controller
@@ -27,7 +28,6 @@ class WorkflowExecutionController extends Controller
     ): JsonResponse {
         $triggerPayload = (array) ($request->input('trigger_payload') ?? []);
 
-        // If payload is empty, auto-generate one from the latest email
         if (empty($triggerPayload)) {
             try {
                 $triggerPayload = $generateTestPayloadAction->execute((int) $request->user()->id, $id);
@@ -35,11 +35,18 @@ class WorkflowExecutionController extends Controller
                 return response()->json([
                     'message' => __('execution::messages.workflow_not_found'),
                 ], 404);
-            } catch (ConnectionNotFoundException | GoogleCredentialsUnavailableException $e) {
+            } catch (ConnectionNotFoundException | GoogleCredentialsUnavailableException) {
                 return response()->json([
                     'message' => 'Please connect a valid Gmail account before testing this workflow.',
-                    'error' => 'credentials_unavailable'
+                    'error' => 'credentials_unavailable',
                 ], 403);
+            } catch (TestEmailUnavailableException $e) {
+                // SPECIFIC STRUCTURED ERROR for empty inbox cases
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'error' => $e->errorCode(),
+                    'context' => $e->context(),
+                ], 422);
             } catch (\InvalidArgumentException | \RuntimeException $e) {
                 return response()->json([
                     'message' => $e->getMessage(),
@@ -73,7 +80,6 @@ class WorkflowExecutionController extends Controller
             'data' => $result->execution->toArray(),
         ], $result->replayed ? 200 : 201);
     }
-
     public function index(
         ListExecutionsRequest $request,
         int $id,

@@ -92,10 +92,43 @@ class Execution
             new OA\Response(response: 409, description: 'Workflow not executable (paused) or overlapping execution', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'message', type: 'string')],
             )),
-            new OA\Response(response: 422, ref: '#/components/responses/ValidationErrorResponse'),
+            new OA\Response(response: 422, description: 'Validation failed, or no test email available.', content: new OA\JsonContent(
+                oneOf: [
+                    new OA\Schema(
+                        properties: [
+                            new OA\Property(property: 'message', type: 'string'),
+                            new OA\Property(
+                                property: 'errors',
+                                type: 'object',
+                                additionalProperties: new OA\AdditionalProperties(
+                                    type: 'array',
+                                    items: new OA\Items(type: 'string'),
+                                ),
+                            ),
+                        ],
+                        type: 'object',
+                    ),
+                    new OA\Schema(
+                        properties: [
+                            new OA\Property(property: 'message', type: 'string'),
+                            new OA\Property(
+                                property: 'error',
+                                type: 'string',
+                                enum: ['no_test_email_available', 'no_test_email_with_attachments_available'],
+                            ),
+                            new OA\Property(property: 'context', type: 'object', properties: [
+                                new OA\Property(property: 'requires_attachment', type: 'boolean'),
+                            ]),
+                        ],
+                        type: 'object',
+                    ),
+                ],
+            )),
         ],
     )]
     public function run(): void {}
+
+
     #[OA\Get(
         path: '/api/workflows/{id}/executions',
         operationId: 'executions.list',
