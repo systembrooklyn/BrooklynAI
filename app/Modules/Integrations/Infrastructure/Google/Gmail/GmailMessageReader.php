@@ -10,7 +10,7 @@ use Google\Service\Gmail\Message as GoogleGmailMessage;
 class GmailMessageReader
 {
     /**
-     * Paginate messages.list until nextPageToken is exhausted.
+     * Paginate messages.list until nextPageToken is exhausted or limit is reached.
      *
      * @param  array<int, string>  $labelIds
      * @return array<int, string>
@@ -20,6 +20,7 @@ class GmailMessageReader
         int $afterEpochSeconds,
         array $labelIds = [],
         ?string $query = null,
+        int $limit = 500, // <--- Added $limit here
     ): array {
         $service = $this->createService($credentials);
 
@@ -35,7 +36,7 @@ class GmailMessageReader
         do {
             $params = [
                 'q' => $fullQuery,
-                'maxResults' => 500,
+                'maxResults' => min($limit, 500),
             ];
 
             if (! empty($labelIds)) {
@@ -54,6 +55,11 @@ class GmailMessageReader
                 if (is_string($id) && $id !== '') {
                     $ids[] = $id;
                 }
+
+                // Stop immediately if we reached our limit
+                if (count($ids) >= $limit) {
+                    break 2;
+                }
             }
 
             $pageToken = $response->getNextPageToken();
@@ -71,11 +77,12 @@ class GmailMessageReader
         return $service->users_messages->get('me', $messageId, ['format' => 'full']);
     }
 
-    protected function createService(ResolvedGoogleCredentials $credentials): GoogleGmailService
+     protected function createService(ResolvedGoogleCredentials $credentials): GoogleGmailService
     {
         $client = new GoogleClient;
-        $client->setClientId((string) env('GOOGLE_CLIENT_ID'));
-        $client->setClientSecret((string) env('GOOGLE_CLIENT_SECRET'));
+        // CHANGED: Use config() instead of env() for production safety
+        $client->setClientId((string) config('services.google.client_id'));
+        $client->setClientSecret((string) config('services.google.client_secret'));
         $client->setAccessType('offline');
         $client->addScope('https://www.googleapis.com/auth/gmail.readonly');
 

@@ -1217,18 +1217,19 @@
                     }
                 ],
                 "requestBody": {
+                    "description": "Leave the body empty to auto-test using the latest email in the connected Gmail inbox.",
                     "required": false,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "properties": {
                                     "trigger_payload": {
+                                        "description": "Optional. If omitted, the backend auto-fetches the latest Gmail message.",
                                         "type": "object",
                                         "nullable": true,
                                         "additionalProperties": true
                                     },
                                     "idempotency_key": {
-                                        "description": "Reserved prefixes `schedule:` and `gmail:` are rejected with 422.",
                                         "type": "string",
                                         "nullable": true,
                                         "maxLength": 191
@@ -1278,6 +1279,25 @@
                     },
                     "401": {
                         "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "description": "Credentials unavailable or connection not found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "credentials_unavailable"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "$ref": "#/components/responses/NotFound"

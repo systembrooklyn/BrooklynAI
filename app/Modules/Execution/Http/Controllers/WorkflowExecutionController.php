@@ -4,6 +4,9 @@ namespace App\Modules\Execution\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Automation\Core\Exceptions\WorkflowNotFoundException;
+use App\Modules\Connections\Core\Exceptions\ConnectionNotFoundException;
+use App\Modules\Connections\Core\Exceptions\GoogleCredentialsUnavailableException;
+use App\Modules\Execution\Application\Actions\GenerateTestPayloadAction;
 use App\Modules\Execution\Application\Actions\ListExecutionsAction;
 use App\Modules\Execution\Application\Actions\RunWorkflowAction;
 use App\Modules\Execution\Application\DTOs\ListExecutionsInput;
@@ -20,12 +23,35 @@ class WorkflowExecutionController extends Controller
         RunWorkflowRequest $request,
         int $id,
         RunWorkflowAction $action,
+        GenerateTestPayloadAction $generateTestPayloadAction,
     ): JsonResponse {
+        $triggerPayload = (array) ($request->input('trigger_payload') ?? []);
+
+        // If payload is empty, auto-generate one from the latest email
+        if (empty($triggerPayload)) {
+            try {
+                $triggerPayload = $generateTestPayloadAction->execute((int) $request->user()->id, $id);
+            } catch (WorkflowNotFoundException) {
+                return response()->json([
+                    'message' => __('execution::messages.workflow_not_found'),
+                ], 404);
+            } catch (ConnectionNotFoundException | GoogleCredentialsUnavailableException $e) {
+                return response()->json([
+                    'message' => 'Please connect a valid Gmail account before testing this workflow.',
+                    'error' => 'credentials_unavailable'
+                ], 403);
+            } catch (\InvalidArgumentException | \RuntimeException $e) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+        }
+
         try {
             $result = $action->execute(new RunWorkflowInput(
                 userId: (int) $request->user()->id,
                 workflowId: $id,
-                triggerPayload: (array) ($request->input('trigger_payload') ?? []),
+                triggerPayload: $triggerPayload,
                 idempotencyKey: $request->input('idempotency_key'),
             ));
         } catch (WorkflowNotFoundException) {
@@ -67,7 +93,7 @@ class WorkflowExecutionController extends Controller
 
         return response()->json([
             'message' => __('execution::messages.list_success'),
-            'data' => array_map(static fn ($d) => $d->toArray(), $items),
+            'data' => array_map(static fn($d) => $d->toArray(), $items),
         ]);
     }
 }

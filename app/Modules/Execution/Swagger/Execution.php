@@ -48,6 +48,7 @@ use OpenApi\Attributes as OA;
 class Execution
 {
     #[OA\Post(
+
         path: '/api/workflows/{id}/execute',
         operationId: 'executions.run',
         tags: ['Executions'],
@@ -57,18 +58,16 @@ class Execution
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(ref: '#/components/parameters/AcceptLanguage'),
         ],
-        requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'trigger_payload', type: 'object', nullable: true, additionalProperties: true),
-                new OA\Property(
-                    property: 'idempotency_key',
-                    type: 'string',
-                    nullable: true,
-                    maxLength: 191,
-                    description: 'Reserved prefixes `schedule:` and `gmail:` are rejected with 422.',
-                ),
-            ],
-        )),
+        requestBody: new OA\RequestBody(
+            required: false,
+            description: 'Leave the body empty to auto-test using the latest email in the connected Gmail inbox.',
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'trigger_payload', type: 'object', nullable: true, additionalProperties: true, description: 'Optional. If omitted, the backend auto-fetches the latest Gmail message.'),
+                    new OA\Property(property: 'idempotency_key', type: 'string', nullable: true, maxLength: 191),
+                ],
+            )
+        ),
         responses: [
             new OA\Response(response: 200, description: 'Idempotent replay', content: new OA\JsonContent(
                 properties: [
@@ -83,6 +82,12 @@ class Execution
                 ],
             )),
             new OA\Response(response: 401, ref: '#/components/responses/Unauthorized'),
+            new OA\Response(response: 403, description: 'Credentials unavailable or connection not found.', content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'message', type: 'string'),
+                    new OA\Property(property: 'error', type: 'string', example: 'credentials_unavailable'),
+                ],
+            )),
             new OA\Response(response: 404, ref: '#/components/responses/NotFound'),
             new OA\Response(response: 409, description: 'Workflow not executable (paused) or overlapping execution', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'message', type: 'string')],
@@ -91,7 +96,6 @@ class Execution
         ],
     )]
     public function run(): void {}
-
     #[OA\Get(
         path: '/api/workflows/{id}/executions',
         operationId: 'executions.list',
