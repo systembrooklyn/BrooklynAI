@@ -7,6 +7,8 @@ use Google\Client as GoogleClient;
 use Google\Service\Gmail as GoogleGmailService;
 use Google\Service\Gmail\Draft as GoogleGmailDraft;
 use Google\Service\Gmail\Message as GoogleGmailMessage;
+use Google\Service\Gmail\MessagePartHeader as GoogleGmailMessagePartHeader;
+use Google\Service\Gmail\Thread as GoogleGmailThread;
 
 class GmailEmailSender
 {
@@ -28,10 +30,25 @@ class GmailEmailSender
     /**
      * Send a reply within an existing Gmail thread.
      *
-     * The Gmail API attaches the outgoing message to the thread by setting
-     * the `threadId` on the Message resource. This is the documented,
-     * provider-native mechanism for replies and does not require fetching
-     * the original message's RFC headers.
+     * Setting `threadId` on the outgoing Message groups it into the thread in
+     * the SENDER'S Gmail account, but it does NOT propagate to the RECIPIENT's
+     * mail client. Recipients thread on the RFC 5322 headers `In-Reply-To:`
+     * and `References:`, not on Gmail's internal thread ID. Without those
+     * headers, the reply appears as a fresh email in any non-Gmail client and
+     * in Gmail's own view when the recipient's Gmail account is different
+     * from the sender's.
+     *
+     * To make the reply thread correctly for recipients, this method:
+     *   1. Reads the last message of $threadId to extract its Message-ID and
+     *      References headers.
+     *   2. Builds the outgoing MIME with In-Reply-To: <parent-message-id> and
+     *      References: <parent-references> <parent-message-id>.
+     *   3. Still sets `threadId` so the sender's own view groups it.
+     *
+     * Graceful fallback: if the parent has no Message-ID (very unusual), the
+     * code sends without In-Reply-To/References. That is exactly today's
+     * behavior — sender sees the thread, recipient sees a new email. The fix
+     * only applies where it can improve the outcome.
      */
     public function reply(
         ResolvedGoogleCredentials $credentials,
@@ -42,7 +59,16 @@ class GmailEmailSender
         string $threadId,
     ): ?string {
         $service = $this->createService($credentials);
-        $message = $this->buildMessage($fromEmail, $to, $subject, $htmlBody);
+
+        $parentHeaders = $this->fetchThreadHeaders($service, $threadId);
+
+        $message = $this->buildMessage(
+            fromEmail: $fromEmail,
+            to: $to,
+            subject: $subject,
+            htmlBody: $htmlBody,
+            parentHeaders: $parentHeaders,
+        );
         $message->setThreadId($threadId);
 
         $sent = $this->dispatch($service, $message);
@@ -150,15 +176,113 @@ class GmailEmailSender
         return new GoogleGmailService($client);
     }
 
+    /**
+     * Fetch the RFC 5322 threading headers of the last message in a thread.
+     *
+     * The last message in the thread is the correct parent for a new reply.
+     * This is what Gmail's own UI does — "Reply" always replies to the newest
+     * message in the conversation.
+     *
+     * Returns nulls when the message has no Message-ID header (rare) or when
+     * the thread has no messages (should not happen; the caller already holds
+     * a valid threadId). Both cases are safe — the reply will be sent without
+     * In-Reply-To/References and fall back to today's behavior.
+     *
+     * Overridable by tests. Never called outside `reply()`.
+     *
+     * @return array{message_id: ?string, references: ?string}
+     */
+    protected function fetchThreadHeaders(
+        GoogleGmailService $service,
+        string $threadId,
+    ): array {
+        try {
+            /** @var GoogleGmailThread $thread */
+            $thread = $service->users_threads->get('me', $threadId, [
+                'format' => 'metadata',
+                'metadataHeaders' => ['Message-ID', 'References', 'In-Reply-To'],
+            ]);
+        } catch (\Throwable) {
+            // Reading the thread failed for any reason. Do not fail the send.
+            // Fall back to today's behavior — threadId-only grouping.
+            return ['message_id' => null, 'references' => null];
+        }
+
+        $messages = $thread->getMessages() ?? [];
+        if (empty($messages)) {
+            return ['message_id' => null, 'references' => null];
+        }
+
+        $parent = $messages[count($messages) - 1];
+        $payload = $parent->getPayload();
+        if ($payload === null) {
+            return ['message_id' => null, 'references' => null];
+        }
+
+        $parentMessageId = null;
+        $parentReferences = null;
+
+        /** @var GoogleGmailMessagePartHeader $header */
+        foreach ($payload->getHeaders() ?? [] as $header) {
+            $name = strtolower((string) $header->getName());
+            $value = (string) $header->getValue();
+
+            if ($name === 'message-id') {
+                $parentMessageId = trim($value);
+            } elseif ($name === 'references') {
+                $parentReferences = trim($value);
+            }
+        }
+
+        if ($parentMessageId === null || $parentMessageId === '') {
+            return ['message_id' => null, 'references' => null];
+        }
+
+        return [
+            'message_id' => $parentMessageId,
+            'references' => $parentReferences !== null && $parentReferences !== ''
+                ? $parentReferences
+                : null,
+        ];
+    }
+
+    /**
+     * @param  array{message_id: ?string, references: ?string}|null  $parentHeaders
+     */
     protected function buildMessage(
         string $fromEmail,
         string $to,
         string $subject,
         string $htmlBody,
+        ?array $parentHeaders = null,
     ): GoogleGmailMessage {
         $rawMessage = "From: {$fromEmail}\r\n";
         $rawMessage .= "To: {$to}\r\n";
         $rawMessage .= "Subject: {$subject}\r\n";
+
+        // RFC 5322 threading headers. Present only for replies where the
+        // parent's Message-ID was successfully resolved.
+        if (
+            $parentHeaders !== null
+            && isset($parentHeaders['message_id'])
+            && is_string($parentHeaders['message_id'])
+            && $parentHeaders['message_id'] !== ''
+        ) {
+            $parentMessageId = $parentHeaders['message_id'];
+
+            $rawMessage .= "In-Reply-To: {$parentMessageId}\r\n";
+
+            $references = isset($parentHeaders['references']) && is_string($parentHeaders['references'])
+                ? trim($parentHeaders['references'])
+                : '';
+
+            $fullReferences = $references !== ''
+                ? $references.' '.$parentMessageId
+                : $parentMessageId;
+
+            $rawMessage .= "References: {$fullReferences}\r\n";
+        }
+
         $rawMessage .= "MIME-Version: 1.0\r\n";
         $rawMessage .= "Content-Type: text/html; charset=utf-8\r\n";
         $rawMessage .= "Content-Transfer-Encoding: quoted-printable\r\n\r\n";
