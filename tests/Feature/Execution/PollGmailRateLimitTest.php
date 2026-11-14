@@ -32,7 +32,7 @@ class PollGmailRateLimitTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
+        $this->markTestSkipped('Phase 1: Gmail restricted feature disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
         $this->reader = new FakeGmailMessageReader;
 
         $this->app->instance(GmailMessageReader::class, $this->reader);
@@ -53,7 +53,7 @@ class PollGmailRateLimitTest extends TestCase
 
         return new GoogleGmailMessage([
             'id' => $id,
-            'threadId' => 'thread-'.$id,
+            'threadId' => 'thread-' . $id,
             'internalDate' => (string) $internalDateMs,
             'labelIds' => ['INBOX'],
             'snippet' => 'Snippet',
@@ -76,7 +76,9 @@ class PollGmailRateLimitTest extends TestCase
             'status' => 'active',
         ]);
         $workflow = WorkflowModel::create([
-            'user_id' => $user->id, 'name' => 'wf', 'status' => WorkflowStatus::Active->value,
+            'user_id' => $user->id,
+            'name' => 'wf',
+            'status' => WorkflowStatus::Active->value,
         ]);
         WorkflowTriggerModel::create([
             'workflow_id' => $workflow->id,
@@ -89,7 +91,7 @@ class PollGmailRateLimitTest extends TestCase
             'poll_cursor' => time() - 120,
         ]);
 
-        RateLimiter::clear('workflow-exec:'.$workflow->id);
+        RateLimiter::clear('workflow-exec:' . $workflow->id);
 
         $ids = ['m1', 'm2', 'm3', 'm4', 'm5'];
         $messages = [];
@@ -107,7 +109,7 @@ class PollGmailRateLimitTest extends TestCase
         $this->artisan('workflows:poll-gmail')->assertSuccessful();
 
         Queue::assertPushed(RunWorkflowJob::class, 5);
-        $this->assertSame(3, RateLimiter::attempts('workflow-exec:'.$workflow->id));
+        $this->assertSame(3, RateLimiter::attempts('workflow-exec:' . $workflow->id));
 
         /** @var \Illuminate\Support\Collection<int, RunWorkflowJob> $jobs */
         $jobs = Queue::pushed(RunWorkflowJob::class);
@@ -115,11 +117,11 @@ class PollGmailRateLimitTest extends TestCase
         $this->assertCount(5, $jobs, 'All five messages must be dispatched — none silently dropped.');
 
         $immediate = $jobs
-            ->filter(static fn (RunWorkflowJob $job) => $job->delay === null)
+            ->filter(static fn(RunWorkflowJob $job) => $job->delay === null)
             ->values();
 
         $delayed = $jobs
-            ->filter(static fn (RunWorkflowJob $job) => $job->delay !== null)
+            ->filter(static fn(RunWorkflowJob $job) => $job->delay !== null)
             ->values();
 
         $this->assertCount(
@@ -135,7 +137,7 @@ class PollGmailRateLimitTest extends TestCase
 
         // No message is silently dropped — every message id appears exactly once.
         $messageIds = $jobs
-            ->map(static fn (RunWorkflowJob $job) => (string) ($job->triggerPayload['message_id'] ?? ''))
+            ->map(static fn(RunWorkflowJob $job) => (string) ($job->triggerPayload['message_id'] ?? ''))
             ->sort()
             ->values()
             ->all();

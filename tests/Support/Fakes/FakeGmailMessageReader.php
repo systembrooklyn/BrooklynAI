@@ -28,6 +28,7 @@ final class FakeGmailMessageReader extends GmailMessageReader
         int $afterEpochSeconds,
         array $labelIds = [],
         ?string $query = null,
+        int $limit = 500,
     ): array {
         $this->listCalls[] = [
             'after' => $afterEpochSeconds,

@@ -82,38 +82,44 @@ class IntegrationCatalogTest extends TestCase
         $this->assertCount(6, $catalog->all());
     }
 
-    public function test_gmail_definition_exposes_documented_actions_and_trigger(): void
+    /**
+     * Phase 1 — Gmail exposes only send_email, and no triggers.
+     * See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.
+     */
+    public function test_gmail_exposes_only_send_email_action(): void
     {
         $catalog = new IntegrationCatalog([new GmailIntegration]);
         $gmail = $catalog->find('google.gmail');
 
         $this->assertNotNull($gmail);
+        $this->assertSame(['send_email'], array_map(static fn ($a) => $a->key, $gmail->actions));
+    }
 
-        $actionKeys = array_map(static fn($a) => $a->key, $gmail->actions);
-        sort($actionKeys);
-        $this->assertSame(
-            [
-                'add_label',
-                'archive',
-                'create_draft',
-                'create_label',
-                'mark_as_read',
-                'mark_as_unread',
-                'remove_label',
-                'reply_to_email',
-                'send_attachment_links_email',
-                'send_email',
-                'trash',
-            ],
-            $actionKeys,
-        );
-        $triggerKeys = array_map(static fn($t) => $t->key, $gmail->triggers);
-        $this->assertSame(
-            ['new_email_received', 'new_email_received_with_attachment'],
-            $triggerKeys,
-        );
+    public function test_gmail_has_zero_triggers(): void
+    {
+        $catalog = new IntegrationCatalog([new GmailIntegration]);
+        $gmail = $catalog->find('google.gmail');
 
-        $this->assertSame('poll', $gmail->triggers[0]->strategy->value);
+        $this->assertNotNull($gmail);
+        $this->assertSame([], $gmail->triggers);
+    }
+
+    public function test_require_returns_definition_for_registered_key(): void
+    {
+        $catalog = new IntegrationCatalog([new GmailIntegration]);
+
+        $definition = $catalog->require('google.gmail');
+
+        $this->assertSame('Gmail', $definition->name);
+    }
+
+    public function test_require_throws_for_unknown_key(): void
+    {
+        $catalog = new IntegrationCatalog([new GmailIntegration]);
+
+        $this->expectException(\App\Modules\Integrations\Core\Exceptions\IntegrationNotFound::class);
+
+        $catalog->require('google.unknown');
     }
 
     private function fakeProvider(string $integrationKey): IntegrationProvider
@@ -137,23 +143,5 @@ class IntegrationCatalogTest extends TestCase
                 );
             }
         };
-    }
-
-    public function test_require_returns_definition_for_registered_key(): void
-    {
-        $catalog = new IntegrationCatalog([new GmailIntegration]);
-
-        $definition = $catalog->require('google.gmail');
-
-        $this->assertSame('Gmail', $definition->name);
-    }
-
-    public function test_require_throws_for_unknown_key(): void
-    {
-        $catalog = new IntegrationCatalog([new GmailIntegration]);
-
-        $this->expectException(\App\Modules\Integrations\Core\Exceptions\IntegrationNotFound::class);
-
-        $catalog->require('google.unknown');
     }
 }

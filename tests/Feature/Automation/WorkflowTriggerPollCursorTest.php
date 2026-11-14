@@ -11,7 +11,11 @@ use Tests\TestCase;
 class WorkflowTriggerPollCursorTest extends TestCase
 {
     use RefreshDatabase;
-
+protected function setUp(): void
+{
+    parent::setUp();
+    $this->markTestSkipped('Phase 1: Gmail triggers/actions disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
+}
     private function createWorkflow(User $user): int
     {
         Sanctum::actingAs($user);

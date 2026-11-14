@@ -13,40 +13,22 @@ class RunWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function activeWorkflow(User $user, array $steps = []): int
+    /**
+     * Phase 1: tests run against DRAFT workflows with a send_email step.
+     * Draft workflows are executable per RunWorkflowAction, so no active
+     * trigger is required. Only the send_email action is exercised.
+     */
+    private function draftWorkflowWithSendEmailStep(User $user): int
     {
         Sanctum::actingAs($user);
 
-        $connection = \App\Modules\Connections\Infrastructure\Eloquent\ConnectionModel::create([
-            'user_id' => $user->id,
-            'provider' => 'google',
-            'external_account_id' => 'gmail-'.uniqid(),
-            'access_token' => 'access',
-            'refresh_token' => 'refresh',
-            'scopes' => [
-                'https://www.googleapis.com/auth/gmail.readonly',
-                'https://www.googleapis.com/auth/gmail.send',
-            ],
-            'status' => 'active',
-        ]);
-
         $id = (int) $this->postJson('/api/workflows', ['name' => 'F'])->json('data.id');
 
-        $this->putJson('/api/workflows/'.$id.'/trigger', [
+        $this->postJson('/api/workflows/'.$id.'/steps', [
             'integration_key' => 'google.gmail',
-            'trigger_key' => 'new_email_received',
-            'connection_id' => $connection->id,
-        ])->assertStatus(200);
-
-        foreach ($steps as $step) {
-            // Step config may or may not have a connection_id; add if missing.
-            if (! array_key_exists('connection_id', $step)) {
-                $step['connection_id'] = $connection->id;
-            }
-            $this->postJson('/api/workflows/'.$id.'/steps', $step)->assertStatus(201);
-        }
-
-        $this->postJson('/api/workflows/'.$id.'/activate')->assertStatus(200);
+            'action_key' => 'send_email',
+            'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B'],
+        ])->assertStatus(201);
 
         return $id;
     }
@@ -54,7 +36,9 @@ class RunWorkflowTest extends TestCase
     public function test_execute_workflow_with_no_steps_succeeds(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user);
+        Sanctum::actingAs($user);
+
+        $id = (int) $this->postJson('/api/workflows', ['name' => 'F'])->json('data.id');
 
         $fake = new FakeActionInvoker;
         $this->app->instance(ActionInvoker::class, $fake);
@@ -72,13 +56,7 @@ class RunWorkflowTest extends TestCase
     public function test_execute_workflow_with_one_step_succeeds(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user, [
-            [
-                'integration_key' => 'google.gmail',
-                'action_key' => 'send_email',
-                'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B'],
-            ],
-        ]);
+        $id = $this->draftWorkflowWithSendEmailStep($user);
 
         $fake = new FakeActionInvoker;
         $fake->onInvoke = fn () => ['sent' => true, 'message_id' => 'm-1'];
@@ -99,10 +77,7 @@ class RunWorkflowTest extends TestCase
     public function test_execute_persists_execution_and_step_rows(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user, [
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B']],
-        ]);
+        $id = $this->draftWorkflowWithSendEmailStep($user);
 
         $fake = new FakeActionInvoker;
         $fake->onInvoke = fn () => ['sent' => true, 'message_id' => 'm-2'];

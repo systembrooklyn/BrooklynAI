@@ -18,15 +18,14 @@ final class CatalogLocalizationTest extends TestCase
         $response = $this->withHeader('Accept-Language', 'ar')->getJson('/api/catalog');
         $response->assertOk();
 
+        // Phase 1: using Gmail's send_email action (still active) to verify
+        // the Integrations module localization remains functional.
         $gmail = collect($response->json('data.integrations'))
             ->firstWhere('integration_key', 'google.gmail');
 
         $this->assertNotNull($gmail);
         $this->assertSame('إرسال بريد إلكتروني', collect($gmail['actions'])
             ->firstWhere('action_key', 'send_email')['label']);
-
-        $this->assertSame('استلام بريد إلكتروني جديد', collect($gmail['triggers'])
-            ->firstWhere('trigger_key', 'new_email_received')['label']);
     }
 
     public function test_catalog_human_readable_labels_are_english_by_default(): void
@@ -42,8 +41,6 @@ final class CatalogLocalizationTest extends TestCase
         $this->assertSame('Gmail', $gmail['name']);
         $this->assertSame('Send Email', collect($gmail['actions'])
             ->firstWhere('action_key', 'send_email')['label']);
-        $this->assertSame('New Email Received', collect($gmail['triggers'])
-            ->firstWhere('trigger_key', 'new_email_received')['label']);
     }
 
     public function test_machine_readable_catalog_identifiers_are_stable(): void
@@ -60,6 +57,8 @@ final class CatalogLocalizationTest extends TestCase
         $enGmail = collect($en)->firstWhere('integration_key', 'google.gmail');
         $arGmail = collect($ar)->firstWhere('integration_key', 'google.gmail');
 
+        // Phase 1: only send_email remains; verify its identifier and
+        // capability are byte-identical across locales.
         $this->assertSame(
             array_column($enGmail['actions'], 'action_key'),
             array_column($arGmail['actions'], 'action_key'),
@@ -68,10 +67,10 @@ final class CatalogLocalizationTest extends TestCase
             array_column($enGmail['actions'], 'capability'),
             array_column($arGmail['actions'], 'capability'),
         );
-        $this->assertSame(
-            array_column($enGmail['triggers'], 'trigger_key'),
-            array_column($arGmail['triggers'], 'trigger_key'),
-        );
+
+        // Phase 1: verify Gmail has no triggers in either locale.
+        $this->assertSame([], $enGmail['triggers']);
+        $this->assertSame([], $arGmail['triggers']);
     }
 
     public function test_catalog_field_keys_are_stable_across_locales(): void
@@ -84,20 +83,14 @@ final class CatalogLocalizationTest extends TestCase
         $enGmail = collect($en)->firstWhere('integration_key', 'google.gmail');
         $arGmail = collect($ar)->firstWhere('integration_key', 'google.gmail');
 
+        // Phase 1: only send_email exists; verify its config field keys
+        // are byte-identical across locales.
         $enSend = collect($enGmail['actions'])->firstWhere('action_key', 'send_email');
         $arSend = collect($arGmail['actions'])->firstWhere('action_key', 'send_email');
 
         $this->assertSame(
             array_keys((array) $enSend['config']),
             array_keys((array) $arSend['config']),
-        );
-
-        $enTrigger = collect($enGmail['triggers'])->firstWhere('trigger_key', 'new_email_received');
-        $arTrigger = collect($arGmail['triggers'])->firstWhere('trigger_key', 'new_email_received');
-
-        $this->assertSame(
-            array_keys((array) $enTrigger['config']),
-            array_keys((array) $arTrigger['config']),
         );
     }
 }

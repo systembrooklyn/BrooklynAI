@@ -7,11 +7,16 @@ use PHPUnit\Framework\TestCase;
 
 final class GmailIntegrationAttachmentTriggerTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->markTestSkipped('Phase 1: Gmail restricted feature disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
+    }
     public function test_gmail_integration_exposes_two_triggers(): void
     {
         $definition = (new GmailIntegration)->definition();
 
-        $keys = array_map(fn ($t) => $t->key, $definition->triggers);
+        $keys = array_map(fn($t) => $t->key, $definition->triggers);
 
         $this->assertContains('new_email_received', $keys);
         $this->assertContains('new_email_received_with_attachment', $keys);
@@ -28,7 +33,7 @@ final class GmailIntegrationAttachmentTriggerTest extends TestCase
         $this->assertSame('poll', $existing->strategy->value);
         $this->assertSame('gmail', $existing->capability);
 
-        $fieldKeys = array_map(fn ($f) => $f->key, $existing->fields);
+        $fieldKeys = array_map(fn($f) => $f->key, $existing->fields);
         $this->assertContains('has_attachment', $fieldKeys);
         $this->assertContains('label_id', $fieldKeys);
         $this->assertContains('from', $fieldKeys);
@@ -54,7 +59,7 @@ final class GmailIntegrationAttachmentTriggerTest extends TestCase
 
         $new = $this->findTrigger($definition->triggers, 'new_email_received_with_attachment');
 
-        $scopes = array_map(fn ($s) => $s->value, $new->requiredScopes);
+        $scopes = array_map(fn($s) => $s->value, $new->requiredScopes);
 
         $this->assertContains('https://www.googleapis.com/auth/gmail.readonly', $scopes);
         $this->assertContains('https://www.googleapis.com/auth/drive.file', $scopes);
@@ -66,7 +71,7 @@ final class GmailIntegrationAttachmentTriggerTest extends TestCase
 
         $new = $this->findTrigger($definition->triggers, 'new_email_received_with_attachment');
 
-        $fieldKeys = array_map(fn ($f) => $f->key, $new->fields);
+        $fieldKeys = array_map(fn($f) => $f->key, $new->fields);
 
         $this->assertNotContains('has_attachment', $fieldKeys);
         $this->assertContains('label_id', $fieldKeys);

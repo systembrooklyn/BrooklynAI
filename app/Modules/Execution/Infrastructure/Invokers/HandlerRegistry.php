@@ -17,21 +17,30 @@ use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailTrashHandler;
 
 final class HandlerRegistry
 {
-    /**
-     * @var array<string, class-string<ActionHandler>>
-     */
+
+
     private const HANDLERS = [
         'google.gmail.send_email' => GmailSendEmailHandler::class,
-        'google.gmail.reply_to_email' => GmailReplyToEmailHandler::class,
-        'google.gmail.create_draft' => GmailCreateDraftHandler::class,
-        'google.gmail.mark_as_read' => GmailMarkAsReadHandler::class,
-        'google.gmail.mark_as_unread' => GmailMarkAsUnreadHandler::class,
-        'google.gmail.archive' => GmailArchiveHandler::class,
-        'google.gmail.trash' => GmailTrashHandler::class,
-        'google.gmail.add_label' => GmailAddLabelHandler::class,
-        'google.gmail.remove_label' => GmailRemoveLabelHandler::class,
-        'google.gmail.create_label' => GmailCreateLabelHandler::class,
-        'google.gmail.send_attachment_links_email' => GmailSendAttachmentLinksEmailHandler::class,
+
+        // Phase 1: disabled (requires gmail.readonly via users.threads.get)
+        // 'google.gmail.reply_to_email' => GmailReplyToEmailHandler::class,
+
+        // Phase 1: disabled (requires gmail.compose)
+        // 'google.gmail.create_draft' => GmailCreateDraftHandler::class,
+
+        // Phase 1: disabled (requires gmail.modify)
+        // 'google.gmail.mark_as_read' => GmailMarkAsReadHandler::class,
+        // 'google.gmail.mark_as_unread' => GmailMarkAsUnreadHandler::class,
+        // 'google.gmail.archive' => GmailArchiveHandler::class,
+        // 'google.gmail.trash' => GmailTrashHandler::class,
+        // 'google.gmail.add_label' => GmailAddLabelHandler::class,
+        // 'google.gmail.remove_label' => GmailRemoveLabelHandler::class,
+
+        // Phase 1: disabled (requires gmail.labels)
+        // 'google.gmail.create_label' => GmailCreateLabelHandler::class,
+
+        // Phase 1: disabled (depends on disabled attachment trigger)
+        // 'google.gmail.send_attachment_links_email' => GmailSendAttachmentLinksEmailHandler::class,
     ];
 
     /**

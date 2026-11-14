@@ -31,7 +31,7 @@ class PollGmailSelfEmailExclusionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
+$this->markTestSkipped('Phase 1: Gmail restricted feature disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
         $this->reader = new FakeGmailMessageReader;
 
         $this->app->instance(GmailMessageReader::class, $this->reader);

@@ -28,6 +28,27 @@ class WorkflowExecutionController extends Controller
     ): JsonResponse {
         $triggerPayload = (array) ($request->input('trigger_payload') ?? []);
 
+        /*
+         * Phase 1 — Gmail test-payload auto-generation disabled.
+         *
+         * The block below previously auto-generated a sample Gmail trigger
+         * payload for "Try flow now" testing when the request did not carry
+         * an explicit trigger_payload. That path reads Gmail messages and
+         * requires gmail.readonly (Restricted). It is preserved in comments
+         * for future reactivation.
+         *
+         * While disabled, an empty trigger_payload simply propagates as an
+         * empty array, and RunWorkflowAction executes the workflow with an
+         * empty payload — which is the same behavior as any non-Gmail
+         * workflow without a configured trigger payload.
+         *
+         * To reactivate:
+         *   1. Uncomment the block below.
+         *   2. Uncomment the Gmail trigger definitions in GmailIntegration.php.
+         *   3. Restore gmail.readonly in CapabilityScopeMap.
+         *   4. Re-enable the PollGmailCommand schedule in routes/console.php.
+         */
+        /*
         if (empty($triggerPayload)) {
             try {
                 $triggerPayload = $generateTestPayloadAction->execute((int) $request->user()->id, $id);
@@ -53,6 +74,7 @@ class WorkflowExecutionController extends Controller
                 ], 422);
             }
         }
+        */
 
         try {
             $result = $action->execute(new RunWorkflowInput(
@@ -80,6 +102,7 @@ class WorkflowExecutionController extends Controller
             'data' => $result->execution->toArray(),
         ], $result->replayed ? 200 : 201);
     }
+
     public function index(
         ListExecutionsRequest $request,
         int $id,

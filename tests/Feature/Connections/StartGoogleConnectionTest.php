@@ -36,7 +36,10 @@ class StartGoogleConnectionTest extends TestCase
         $this->assertSame((int) $user->id, (int) OAuthStateModel::query()->first()->user_id);
     }
 
-    public function test_start_with_gmail_capability_includes_gmail_scopes(): void
+    /**
+     * Phase 1: gmail capability now requests ONLY gmail.send.
+     */
+    public function test_start_with_gmail_capability_includes_only_send_scope(): void
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
@@ -54,14 +57,8 @@ class StartGoogleConnectionTest extends TestCase
         $scopes = explode(' ', $query['scope'] ?? '');
         sort($scopes);
 
-        // PHP `sort()` uses byte comparison; URL strings start with 'h'
-        // which sorts after 'email' (e) but before 'openid' (o).
         $this->assertSame([
             'email',
-            'https://www.googleapis.com/auth/gmail.compose',
-            'https://www.googleapis.com/auth/gmail.labels',
-            'https://www.googleapis.com/auth/gmail.modify',
-            'https://www.googleapis.com/auth/gmail.readonly',
             'https://www.googleapis.com/auth/gmail.send',
             'openid',
             'profile',

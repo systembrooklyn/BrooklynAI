@@ -20,10 +20,25 @@ final class GenerateTestPayloadAction
     ) {}
 
     /**
+     * Phase 1 — disabled Gmail read path.
+     *
+     * This action required gmail.readonly (Restricted) to auto-generate a
+     * sample Gmail trigger payload for "Try flow now" testing. The entire
+     * implementation is preserved below in comments. When Gmail triggers
+     * are reactivated, uncomment the implementation, re-enable the
+     * corresponding Gmail trigger definitions, and re-enable
+     * gmail.readonly in CapabilityScopeMap.
+     *
+     * The class and constructor are preserved so that existing imports
+     * (and downstream service bindings) do not break. Calling execute()
+     * while the feature is disabled throws a RuntimeException that the
+     * caller in WorkflowExecutionController converts into an HTTP 422.
+     *
      * @return array<string, mixed>
      */
     public function execute(int $userId, int $workflowId): array
     {
+        /*
         $workflow = $this->workflows->findForUser($userId, $workflowId);
 
         if ($workflow === null) {
@@ -59,5 +74,10 @@ final class GenerateTestPayloadAction
         $message = $this->reader->getMessage($credentials, $latestMessageId);
 
         return $this->payloadBuilder->build($message);
+        */
+
+        throw new \RuntimeException(
+            'Gmail test payload generation is disabled in the current send-only release. Provide trigger_payload explicitly, or reconnect Gmail after this feature is reactivated.'
+        );
     }
 }

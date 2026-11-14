@@ -37,9 +37,17 @@ Route::middleware('auth:sanctum')->prefix('api')->group(function () {
     // Catalog / Discovery
     Route::get('/catalog', CatalogController::class);
 
-    // Gmail
+    /*
+     * Phase 1 — Gmail send-only.
+     *
+     * Only the send_email HTTP endpoint remains active. The Gmail labels
+     * endpoint requires gmail.readonly or gmail.labels (restricted from the
+     * current release). Its controller and service remain preserved in the
+     * codebase for future reactivation.
+     */
     Route::post('/email/send', SendGmailEmailController::class);
-    Route::get('/gmail/labels', ListGmailLabelsController::class);
+    // Phase 1: disabled (requires gmail.readonly / gmail.labels)
+    // Route::get('/gmail/labels', ListGmailLabelsController::class);
 
     // Google Calendar
     Route::post('/calendar/events', CreateCalendarEventController::class);

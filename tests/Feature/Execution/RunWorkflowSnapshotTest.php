@@ -3,6 +3,7 @@
 namespace Tests\Feature\Execution;
 
 use App\Models\User;
+use App\Modules\Automation\Infrastructure\Eloquent\WorkflowTriggerModel;
 use App\Modules\Execution\Core\Contracts\ActionInvoker;
 use App\Modules\Execution\Infrastructure\Eloquent\ExecutionModel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,22 +15,31 @@ class RunWorkflowSnapshotTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function activeWorkflow(User $user, array $steps = []): int
+    /**
+     * Phase 1: creates a draft workflow with a trigger row inserted
+     * directly via model (upsert API disabled for Gmail triggers) plus
+     * a send_email step. Draft workflows execute; no activation needed.
+     */
+    private function draftWorkflowWithTriggerAndStep(User $user): int
     {
         Sanctum::actingAs($user);
 
         $id = (int) $this->postJson('/api/workflows', ['name' => 'SnapshotFlow'])->json('data.id');
 
-        $this->putJson('/api/workflows/'.$id.'/trigger', [
+        WorkflowTriggerModel::create([
+            'workflow_id' => $id,
             'integration_key' => 'google.gmail',
             'trigger_key' => 'new_email_received',
+            'connection_id' => null,
+            'strategy' => 'poll',
+            'config' => [],
         ]);
 
-        foreach ($steps as $step) {
-            $this->postJson('/api/workflows/'.$id.'/steps', $step);
-        }
-
-        $this->postJson('/api/workflows/'.$id.'/activate');
+        $this->postJson('/api/workflows/'.$id.'/steps', [
+            'integration_key' => 'google.gmail',
+            'action_key' => 'send_email',
+            'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B'],
+        ])->assertStatus(201);
 
         return $id;
     }
@@ -37,10 +47,7 @@ class RunWorkflowSnapshotTest extends TestCase
     public function test_workflow_snapshot_contains_expected_keys(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user, [
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B']],
-        ]);
+        $id = $this->draftWorkflowWithTriggerAndStep($user);
 
         $this->app->instance(ActionInvoker::class, new FakeActionInvoker);
 
@@ -69,10 +76,7 @@ class RunWorkflowSnapshotTest extends TestCase
     public function test_workflow_snapshot_uses_definition_at_execution_time(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user, [
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B']],
-        ]);
+        $id = $this->draftWorkflowWithTriggerAndStep($user);
 
         $this->app->instance(ActionInvoker::class, new FakeActionInvoker);
 
