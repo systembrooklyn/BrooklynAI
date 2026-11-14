@@ -3,6 +3,7 @@
 namespace Tests\Feature\Execution;
 
 use App\Models\User;
+use App\Modules\Automation\Infrastructure\Eloquent\WorkflowModel;
 use App\Modules\Execution\Core\Contracts\ActionInvoker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -17,58 +18,25 @@ class RunWorkflowValidationTest extends TestCase
     {
         Sanctum::actingAs($user);
 
-        $id = (int) $this->postJson('/api/workflows', ['name' => 'F'])->json('data.id');
-
-        $this->putJson('/api/workflows/'.$id.'/trigger', [
-            'integration_key' => 'google.gmail',
-            'trigger_key' => 'new_email_received',
-        ]);
-
-        return $id;
+        return (int) $this->postJson('/api/workflows', ['name' => 'F'])->json('data.id');
     }
 
+    /**
+     * Phase 1: paused workflow created via direct model insert to avoid
+     * needing an activatable trigger. Workflow status is the only thing
+     * that matters for the "execute paused workflow returns 409" rule.
+     */
     private function pausedWorkflow(User $user): int
     {
         Sanctum::actingAs($user);
 
-        $connection = \App\Modules\Connections\Infrastructure\Eloquent\ConnectionModel::create([
+        $workflow = WorkflowModel::create([
             'user_id' => $user->id,
-            'provider' => 'google',
-            'external_account_id' => 'gmail-'.uniqid(),
-            'access_token' => 'access',
-            'refresh_token' => 'refresh',
-            'scopes' => ['https://www.googleapis.com/auth/gmail.readonly'],
-            'status' => 'active',
+            'name' => 'Paused Flow',
+            'status' => 'paused',
         ]);
 
-        $id = (int) $this->postJson('/api/workflows', ['name' => 'F'])->json('data.id');
-
-        $this->putJson('/api/workflows/'.$id.'/trigger', [
-            'integration_key' => 'google.gmail',
-            'trigger_key' => 'new_email_received',
-            'connection_id' => $connection->id,
-        ]);
-
-        $this->postJson('/api/workflows/'.$id.'/activate');
-        $this->postJson('/api/workflows/'.$id.'/pause');
-
-        return $id;
-    }
-
-    private function activeWorkflow(User $user): int
-    {
-        Sanctum::actingAs($user);
-
-        $id = (int) $this->postJson('/api/workflows', ['name' => 'F'])->json('data.id');
-
-        $this->putJson('/api/workflows/'.$id.'/trigger', [
-            'integration_key' => 'google.gmail',
-            'trigger_key' => 'new_email_received',
-        ]);
-
-        $this->postJson('/api/workflows/'.$id.'/activate');
-
-        return $id;
+        return (int) $workflow->id;
     }
 
     public function test_execute_allows_draft_workflow(): void
@@ -94,7 +62,7 @@ class RunWorkflowValidationTest extends TestCase
     public function test_execute_validates_trigger_payload_must_be_array(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user);
+        $id = $this->draftWorkflow($user);
 
         $this->app->instance(ActionInvoker::class, new FakeActionInvoker);
 
@@ -109,7 +77,7 @@ class RunWorkflowValidationTest extends TestCase
     public function test_execute_validates_idempotency_key_max_length(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user);
+        $id = $this->draftWorkflow($user);
 
         $this->app->instance(ActionInvoker::class, new FakeActionInvoker);
 

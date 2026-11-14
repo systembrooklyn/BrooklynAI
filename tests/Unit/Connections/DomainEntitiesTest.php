@@ -17,7 +17,7 @@ class DomainEntitiesTest extends TestCase
         $b = OAuthState::generate(1, 'google', ['openid', 'email', 'profile'], new DateTimeImmutable);
 
         $this->assertNotSame($a->state, $b->state);
-        $this->assertSame(64, strlen($a->state)); // 32 bytes -> 64 hex chars
+        $this->assertSame(64, strlen($a->state));
         $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $a->state);
         $this->assertSame(['openid', 'email', 'profile'], $a->scopesRequested);
         $this->assertNull($a->consumedAt);
@@ -38,6 +38,7 @@ class DomainEntitiesTest extends TestCase
             state: $state->state,
             userId: 1,
             provider: 'google',
+            platform: OAuthState::PLATFORM_WEB,
             scopesRequested: ['openid'],
             expiresAt: $state->expiresAt,
             consumedAt: $now,

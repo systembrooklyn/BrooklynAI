@@ -15,39 +15,19 @@ class RunWorkflowFailureTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function activeWorkflow(User $user, array $steps): int
+    private function draftWorkflow(User $user, int $stepCount = 1): int
     {
         Sanctum::actingAs($user);
 
-        $connection = \App\Modules\Connections\Infrastructure\Eloquent\ConnectionModel::create([
-            'user_id' => $user->id,
-            'provider' => 'google',
-            'external_account_id' => 'gmail-'.uniqid(),
-            'access_token' => 'access',
-            'refresh_token' => 'refresh',
-            'scopes' => [
-                'https://www.googleapis.com/auth/gmail.readonly',
-                'https://www.googleapis.com/auth/gmail.send',
-            ],
-            'status' => 'active',
-        ]);
-
         $id = (int) $this->postJson('/api/workflows', ['name' => 'F'])->json('data.id');
 
-        $this->putJson('/api/workflows/'.$id.'/trigger', [
-            'integration_key' => 'google.gmail',
-            'trigger_key' => 'new_email_received',
-            'connection_id' => $connection->id,
-        ]);
-
-        foreach ($steps as $step) {
-            if (! array_key_exists('connection_id', $step)) {
-                $step['connection_id'] = $connection->id;
-            }
-            $this->postJson('/api/workflows/'.$id.'/steps', $step)->assertStatus(201);
+        for ($i = 0; $i < $stepCount; $i++) {
+            $this->postJson('/api/workflows/'.$id.'/steps', [
+                'integration_key' => 'google.gmail',
+                'action_key' => 'send_email',
+                'config' => ['to' => 'r'.$i.'@example.com', 'subject' => 'S', 'body' => 'B'],
+            ])->assertStatus(201);
         }
-
-        $this->postJson('/api/workflows/'.$id.'/activate');
 
         return $id;
     }
@@ -55,10 +35,7 @@ class RunWorkflowFailureTest extends TestCase
     public function test_step_failure_marks_execution_failed(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user, [
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B']],
-        ]);
+        $id = $this->draftWorkflow($user, 1);
 
         $fake = new FakeActionInvoker;
         $fake->onInvoke = fn () => throw ActionInvocationFailed::forInvalidConfig('to');
@@ -74,14 +51,7 @@ class RunWorkflowFailureTest extends TestCase
     public function test_step_failure_marks_remaining_steps_skipped(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user, [
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B']],
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'b@example.com', 'subject' => 'S', 'body' => 'B']],
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'c@example.com', 'subject' => 'S', 'body' => 'B']],
-        ]);
+        $id = $this->draftWorkflow($user, 3);
 
         $fake = new FakeActionInvoker;
         $fake->onInvoke = fn () => throw ActionInvocationFailed::forInvalidConfig('to');
@@ -116,13 +86,13 @@ class RunWorkflowFailureTest extends TestCase
         ]);
     }
 
-    public function test_workflow_remains_active_after_failed_execution(): void
+    public function test_workflow_remains_draft_after_failed_execution(): void
     {
+        // Phase 1: renamed intent. The test now verifies that a DRAFT
+        // workflow remains in draft status after a failed execution
+        // (executions do not change workflow status). Uses send_email only.
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user, [
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B']],
-        ]);
+        $id = $this->draftWorkflow($user, 1);
 
         $fake = new FakeActionInvoker;
         $fake->onInvoke = fn () => throw ActionInvocationFailed::forInvalidConfig('to');
@@ -132,17 +102,14 @@ class RunWorkflowFailureTest extends TestCase
 
         $this->assertDatabaseHas('workflows', [
             'id' => $id,
-            'status' => 'active',
+            'status' => 'draft',
         ]);
     }
 
     public function test_step_failure_persists_truncated_error_message(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user, [
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B']],
-        ]);
+        $id = $this->draftWorkflow($user, 1);
 
         $fake = new FakeActionInvoker;
         $fake->onInvoke = fn () => throw new ActionInvocationFailed(str_repeat('x', 5000));
@@ -158,10 +125,7 @@ class RunWorkflowFailureTest extends TestCase
     public function test_unexpected_exception_types_propagate_and_return_500(): void
     {
         $user = User::factory()->create();
-        $id = $this->activeWorkflow($user, [
-            ['integration_key' => 'google.gmail', 'action_key' => 'send_email',
-                'config' => ['to' => 'a@example.com', 'subject' => 'S', 'body' => 'B']],
-        ]);
+        $id = $this->draftWorkflow($user, 1);
 
         $fake = new FakeActionInvoker;
         $fake->onInvoke = fn () => throw new \LogicException('unexpected');

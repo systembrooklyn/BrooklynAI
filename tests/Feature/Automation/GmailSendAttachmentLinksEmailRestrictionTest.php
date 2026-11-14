@@ -35,6 +35,11 @@ final class GmailSendAttachmentLinksEmailRestrictionTest extends TestCase
         'https://www.googleapis.com/auth/drive.file',
     ];
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->markTestSkipped('Phase 1: Gmail restricted feature disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
+    }
     public function test_action_is_accepted_with_attachment_trigger(): void
     {
         [$user, $workflow, $connection] = $this->fixture();
@@ -328,7 +333,7 @@ final class GmailSendAttachmentLinksEmailRestrictionTest extends TestCase
         $connection = ConnectionModel::create([
             'user_id' => $user->id,
             'provider' => 'google',
-            'external_account_id' => 'google-sub-'.uniqid('', true),
+            'external_account_id' => 'google-sub-' . uniqid('', true),
             'email' => 'owner@example.com',
             'display_name' => 'Owner',
             'access_token' => 'access-token',

@@ -27,6 +27,8 @@ class WorkflowShowIncludesDefinitionTest extends TestCase
 
     public function test_show_returns_trigger_after_upsert(): void
     {
+        $this->markTestSkipped('Phase 1: Gmail trigger disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
+
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
@@ -48,6 +50,8 @@ class WorkflowShowIncludesDefinitionTest extends TestCase
 
     public function test_show_returns_steps_after_creation(): void
     {
+        $this->markTestSkipped('Phase 1: Gmail trigger disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
+
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 

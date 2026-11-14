@@ -35,16 +35,16 @@ final class DriveCapabilityTest extends TestCase
         $this->assertCount(1, $this->map->resolve('drive'));
     }
 
-    public function test_gmail_capability_is_unchanged(): void
+    /**
+     * Phase 1 — Gmail capability is send-only.
+     * See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.
+     */
+    public function test_gmail_capability_is_send_only(): void
     {
         $this->assertTrue($this->map->has('gmail'));
 
         $this->assertSame([
-            'https://www.googleapis.com/auth/gmail.readonly',
             'https://www.googleapis.com/auth/gmail.send',
-            'https://www.googleapis.com/auth/gmail.compose',
-            'https://www.googleapis.com/auth/gmail.modify',
-            'https://www.googleapis.com/auth/gmail.labels',
         ], $this->map->resolve('gmail'));
     }
 

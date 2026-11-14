@@ -79,30 +79,18 @@ class GoogleIntegrationsMetadataTest extends TestCase
         }
     }
 
-    public function test_gmail_declares_documented_actions_and_trigger(): void
+    /**
+     * Phase 1: Gmail exposes only send_email, and zero triggers.
+     */
+    public function test_gmail_send_only_metadata(): void
     {
         $gmail = $this->catalog()->require('google.gmail');
 
         $actionKeys = array_map(static fn($a) => $a->key, $gmail->actions);
-        sort($actionKeys);
-        $this->assertSame(
-            [
-                'add_label',
-                'archive',
-                'create_draft',
-                'create_label',
-                'mark_as_read',
-                'mark_as_unread',
-                'remove_label',
-                'reply_to_email',
-                'send_attachment_links_email',
-                'send_email',
-                'trash',
-            ],
-            $actionKeys,
-        );
+        $this->assertSame(['send_email'], $actionKeys);
+
         $triggerKeys = array_map(static fn($t) => $t->key, $gmail->triggers);
-        $this->assertSame(['new_email_received', 'new_email_received_with_attachment'], $triggerKeys);
+        $this->assertSame([], $triggerKeys);
     }
 
     public function test_calendar_declares_expected_actions(): void

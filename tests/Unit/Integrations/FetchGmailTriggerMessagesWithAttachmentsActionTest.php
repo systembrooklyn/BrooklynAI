@@ -154,6 +154,7 @@ class InMemoryGmailMessageReader extends GmailMessageReader
         int $afterEpochSeconds,
         array $labelIds = [],
         ?string $query = null,
+        int $limit = 500,
     ): array {
         return array_keys($this->messages);
     }

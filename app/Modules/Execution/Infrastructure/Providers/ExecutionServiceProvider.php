@@ -29,7 +29,22 @@ class ExecutionServiceProvider extends ServiceProvider
         $this->app->singleton(TriggerStrategyRegistry::class, function ($app) {
             $registry = new TriggerStrategyRegistry;
             $registry->register($app->make(ScheduleStrategy::class));
-            $registry->register($app->make(GmailPollStrategy::class));
+
+            /*
+             * Phase 1 — GmailPollStrategy disabled.
+             *
+             * The Gmail polling trigger requires gmail.readonly (Restricted),
+             * which is outside the send-only release. The GmailPollStrategy
+             * class and all its dependencies are preserved in the codebase.
+             *
+             * To reactivate: uncomment the line below, uncomment the
+             * corresponding TriggerDefinition entries in
+             * App\Modules\Integrations\Infrastructure\Google\GmailIntegration,
+             * re-enable PollGmailCommand below, and restore gmail.readonly in
+             * CapabilityScopeMap.
+             */
+            // $registry->register($app->make(GmailPollStrategy::class));
+
             return $registry;
         });
     }
@@ -42,7 +57,24 @@ class ExecutionServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 RunScheduledWorkflowsCommand::class,
-                PollGmailCommand::class,
+
+                /*
+                 * Phase 1 — PollGmailCommand disabled.
+                 *
+                 * The Gmail polling command reads Gmail messages and requires
+                 * gmail.readonly (Restricted). It is not registered in the
+                 * current release. The command class and its private helper
+                 * methods remain in the codebase for future reactivation.
+                 *
+                 * To reactivate: uncomment the line below, restore the
+                 * command's handle() body, re-enable the schedule in
+                 * routes/console.php, uncomment the TriggerDefinition entries
+                 * in GmailIntegration.php, re-register GmailPollStrategy in
+                 * the TriggerStrategyRegistry above, and restore gmail.readonly
+                 * in CapabilityScopeMap.
+                 */
+                // PollGmailCommand::class,
+
                 RecoverFailedPollExecutionsCommand::class,
             ]);
         }

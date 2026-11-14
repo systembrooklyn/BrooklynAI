@@ -95,8 +95,9 @@ class CatalogEndpointTest extends TestCase
         $this->assertArrayNotHasKey('key', $gmail);
     }
 
-    public function test_gmail_trigger_uses_canonical_keys_and_config_map(): void
+    public function test_gmail_exposes_only_send_email_action(): void
     {
+        // Phase 1: negative test confirming only send_email is available.
         $this->actingAsUser();
 
         $body = $this->getJson('/api/catalog')->json();
@@ -104,22 +105,25 @@ class CatalogEndpointTest extends TestCase
         $gmail = collect($body['data']['integrations'])
             ->firstWhere('integration_key', 'google.gmail');
 
-        $trigger = $gmail['triggers'][0];
+        $actionKeys = array_column($gmail['actions'], 'action_key');
 
-        $this->assertSame('new_email_received', $trigger['trigger_key']);
-        $this->assertSame('New Email Received', $trigger['label']);
-        $this->assertSame('poll', $trigger['strategy']);
-        $this->assertSame('gmail', $trigger['capability']);
-        $this->assertArrayNotHasKey('key', $trigger);
-        $this->assertArrayNotHasKey('fields', $trigger);
-        $this->assertArrayNotHasKey('required_scopes', $trigger);
+        $this->assertSame(['send_email'], $actionKeys);
 
-        $this->assertArrayHasKey('config', $trigger);
-        $this->assertArrayHasKey('label_id', $trigger['config']);
+        $this->assertNotContains('reply_to_email', $actionKeys);
+        $this->assertNotContains('create_draft', $actionKeys);
+        $this->assertNotContains('mark_as_read', $actionKeys);
+        $this->assertNotContains('mark_as_unread', $actionKeys);
+        $this->assertNotContains('archive', $actionKeys);
+        $this->assertNotContains('trash', $actionKeys);
+        $this->assertNotContains('add_label', $actionKeys);
+        $this->assertNotContains('remove_label', $actionKeys);
+        $this->assertNotContains('create_label', $actionKeys);
+        $this->assertNotContains('send_attachment_links_email', $actionKeys);
     }
 
-    public function test_gmail_label_id_exposes_dynamic_options_source(): void
+    public function test_gmail_exposes_zero_triggers(): void
     {
+        // Phase 1: negative test confirming Gmail has no active triggers.
         $this->actingAsUser();
 
         $body = $this->getJson('/api/catalog')->json();
@@ -127,18 +131,7 @@ class CatalogEndpointTest extends TestCase
         $gmail = collect($body['data']['integrations'])
             ->firstWhere('integration_key', 'google.gmail');
 
-        $labelId = $gmail['triggers'][0]['config']['label_id'];
-
-        $this->assertSame('Label', $labelId['label']);
-        $this->assertSame('select', $labelId['type']);
-        $this->assertFalse($labelId['required']);
-
-        $this->assertArrayHasKey('options_source', $labelId);
-        $this->assertSame('gmail.labels', $labelId['options_source']['operation_id']);
-        $this->assertSame(
-            ['connection_id' => '{{connection_id}}'],
-            $labelId['options_source']['params'],
-        );
+        $this->assertSame([], $gmail['triggers']);
     }
 
     public function test_gmail_send_email_action_exposes_config_map(): void

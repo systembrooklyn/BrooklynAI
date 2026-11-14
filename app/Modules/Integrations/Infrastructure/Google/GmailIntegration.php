@@ -32,6 +32,13 @@ final class GmailIntegration implements IntegrationProvider
             nameKey: self::NS . '.name',
             descriptionKey: self::NS . '.description',
             actions: [
+                /*
+                 * Phase 1 — Send Email only.
+                 *
+                 * This is the single active Gmail action for the current
+                 * release. Its only required scope is gmail.send, which is
+                 * also the only Gmail scope requested by CapabilityScopeMap.
+                 */
                 new ActionDefinition(
                     key: 'send_email',
                     label: 'Send Email',
@@ -46,6 +53,24 @@ final class GmailIntegration implements IntegrationProvider
                         new FieldDefinition(key: 'body', label: 'Body', labelKey: self::NS . '.actions.send_email.fields.body.label', type: 'text', required: true),
                     ],
                 ),
+
+                /*
+                 * Phase 1 — Disabled Gmail actions.
+                 *
+                 * All actions below are excluded from the current release because
+                 * they require additional Gmail scopes beyond gmail.send
+                 * (gmail.compose, gmail.modify, gmail.labels), or depend on
+                 * triggers that require gmail.readonly (Restricted).
+                 *
+                 * To reactivate any of them:
+                 *   1. Uncomment the ActionDefinition below.
+                 *   2. Uncomment the corresponding mapping in HandlerRegistry.
+                 *   3. Restore the required scope(s) in CapabilityScopeMap.
+                 *   4. If the action depends on a trigger, also re-enable the
+                 *      matching TriggerDefinition and trigger strategy registration.
+                 */
+
+                /*
                 new ActionDefinition(
                     key: 'reply_to_email',
                     label: 'Reply to Email',
@@ -316,8 +341,26 @@ final class GmailIntegration implements IntegrationProvider
                         ),
                     ],
                 ),
+                */
             ],
             triggers: [
+                /*
+                 * Phase 1 — Disabled Gmail triggers.
+                 *
+                 * Both triggers require gmail.readonly (Restricted), which is
+                 * outside the current send-only release. They are also
+                 * unregistered from TriggerStrategyRegistry in
+                 * App\Modules\Execution\Infrastructure\Providers\ExecutionServiceProvider.
+                 *
+                 * To reactivate:
+                 *   1. Uncomment the TriggerDefinition(s) below.
+                 *   2. Re-enable GmailPollStrategy registration in
+                 *      ExecutionServiceProvider.
+                 *   3. Restore gmail.readonly in CapabilityScopeMap.
+                 *   4. Re-enable the corresponding action handlers if any
+                 *      trigger-dependent action is reactivated.
+                 */
+                /*
                 new TriggerDefinition(
                     key: 'new_email_received',
                     label: 'New Email Received',
@@ -429,6 +472,7 @@ final class GmailIntegration implements IntegrationProvider
                         ),
                     ],
                 ),
+                */
             ],
         );
     }

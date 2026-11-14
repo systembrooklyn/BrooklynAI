@@ -34,6 +34,7 @@ class PollGmailCommandTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->markTestSkipped('Phase 1: Gmail restricted feature disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
 
         $this->reader = new FakeGmailMessageReader;
         $this->resolver = new FakeGoogleCredentialsResolver;
@@ -52,7 +53,7 @@ class PollGmailCommandTest extends TestCase
     ): int {
         $workflow = WorkflowModel::create([
             'user_id' => $user->id,
-            'name' => 'W-'.uniqid(),
+            'name' => 'W-' . uniqid(),
             'status' => $status,
         ]);
 
@@ -82,7 +83,7 @@ class PollGmailCommandTest extends TestCase
 
         return new GoogleGmailMessage(array_merge([
             'id' => $id,
-            'threadId' => 'thread-'.$id,
+            'threadId' => 'thread-' . $id,
             'internalDate' => (string) $internalDateMs,
             'labelIds' => ['INBOX'],
             'snippet' => 'Snippet',
@@ -321,7 +322,7 @@ class PollGmailCommandTest extends TestCase
             ->get();
 
         $messageIds = $executions
-            ->map(static fn ($e) => $e->trigger_payload['message_id'] ?? null)
+            ->map(static fn($e) => $e->trigger_payload['message_id'] ?? null)
             ->filter()
             ->values()
             ->all();
@@ -359,7 +360,7 @@ class PollGmailCommandTest extends TestCase
 
         $this->assertDatabaseHas('executions', [
             'workflow_id' => $id,
-            'idempotency_key' => 'gmail:'.$id.':m-abc',
+            'idempotency_key' => 'gmail:' . $id . ':m-abc',
         ]);
     }
 
@@ -608,7 +609,7 @@ class PollGmailCommandTest extends TestCase
             1,
             ExecutionModel::query()
                 ->where('workflow_id', $id)
-                ->where('idempotency_key', 'gmail:'.$id.':m-1')
+                ->where('idempotency_key', 'gmail:' . $id . ':m-1')
                 ->count()
         );
     }

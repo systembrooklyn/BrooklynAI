@@ -26,6 +26,8 @@ class WorkflowActivationRequiresTriggerTest extends TestCase
 
     public function test_activate_after_setting_trigger_succeeds(): void
     {
+        $this->markTestSkipped('Phase 1: Gmail trigger disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
+
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 

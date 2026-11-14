@@ -14,6 +14,11 @@ final class GmailAttachmentTriggerActivationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->markTestSkipped('Phase 1: Gmail restricted feature disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
+    }
     public function test_attachment_trigger_activation_succeeds_when_drive_scope_is_present(): void
     {
         $user = User::factory()->create();

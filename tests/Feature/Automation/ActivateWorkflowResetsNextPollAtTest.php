@@ -15,6 +15,11 @@ class ActivateWorkflowResetsNextPollAtTest extends TestCase
     use RefreshDatabase;
 
     private const SCOPE_READONLY = 'https://www.googleapis.com/auth/gmail.readonly';
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->markTestSkipped('Phase 1: Gmail triggers/actions disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
+    }
 
     public function test_activation_resets_next_poll_at_to_null(): void
     {
@@ -24,7 +29,7 @@ class ActivateWorkflowResetsNextPollAtTest extends TestCase
         $connection = ConnectionModel::create([
             'user_id' => $user->id,
             'provider' => 'google',
-            'external_account_id' => 'gmail-'.uniqid(),
+            'external_account_id' => 'gmail-' . uniqid(),
             'access_token' => 'access',
             'refresh_token' => 'refresh',
             'scopes' => [self::SCOPE_READONLY],
@@ -32,7 +37,9 @@ class ActivateWorkflowResetsNextPollAtTest extends TestCase
         ]);
 
         $workflow = WorkflowModel::create([
-            'user_id' => $user->id, 'name' => 'wf', 'status' => 'paused',
+            'user_id' => $user->id,
+            'name' => 'wf',
+            'status' => 'paused',
         ]);
 
         $trigger = WorkflowTriggerModel::create([
@@ -47,7 +54,7 @@ class ActivateWorkflowResetsNextPollAtTest extends TestCase
             'next_poll_at' => (new \DateTimeImmutable)->modify('+30 minutes'),
         ]);
 
-        $this->postJson('/api/workflows/'.$workflow->id.'/activate')->assertStatus(200);
+        $this->postJson('/api/workflows/' . $workflow->id . '/activate')->assertStatus(200);
 
         $trigger->refresh();
         $this->assertNull($trigger->next_poll_at);

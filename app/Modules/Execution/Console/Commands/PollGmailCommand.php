@@ -53,6 +53,30 @@ final class PollGmailCommand extends Command
         ConnectionRepository $connections,
         GmailTriggerQueryComposer $queryComposer,
     ): int {
+        /*
+         * Phase 1 — Gmail polling command disabled.
+         *
+         * The Gmail polling trigger requires gmail.readonly (Restricted),
+         * which is outside the current send-only release. This command is
+         * also no longer registered in ExecutionServiceProvider, so it is
+         * not reachable via `php artisan`. This guard is defense-in-depth
+         * in case the command is re-registered without reading the Phase 1
+         * plan first.
+         *
+         * To reactivate:
+         *   1. Uncomment the body below.
+         *   2. Re-register the command in
+         *      App\Modules\Execution\Infrastructure\Providers\ExecutionServiceProvider
+         *      ($this->commands([...])).
+         *   3. Re-enable the schedule in routes/console.php.
+         *   4. Restore gmail.readonly in CapabilityScopeMap.
+         *   5. Uncomment the TriggerDefinition entries in GmailIntegration.php.
+         *   6. Re-register GmailPollStrategy in ExecutionServiceProvider.
+         */
+        $this->error('Phase 1: Gmail polling is disabled in the send-only release. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.');
+        return self::FAILURE;
+
+        /*
         $now = new DateTimeImmutable;
 
         $discovered = $workflows->listActiveWithTriggerDue(
@@ -114,8 +138,17 @@ final class PollGmailCommand extends Command
         $this->info(sprintf('Processed %d. Executed %d. Skipped %d.', $processed, $executed, $skipped));
 
         return self::SUCCESS;
+        */
     }
 
+    /**
+     * Phase 1 — preserved but unreachable.
+     *
+     * These private helper methods belong to the disabled polling path.
+     * They are kept intact so that reactivation of the command does not
+     * require rewriting them. They are never invoked while the guard at
+     * the top of handle() returns early.
+     */
     private function processWorkflow(
         Workflow $workflow,
         WorkflowTrigger $trigger,

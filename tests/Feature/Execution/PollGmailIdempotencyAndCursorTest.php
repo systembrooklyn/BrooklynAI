@@ -33,7 +33,7 @@ class PollGmailIdempotencyAndCursorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
+        $this->markTestSkipped('Phase 1: Gmail restricted feature disabled. See GOOGLE_INTEGRATIONS_MASTER_PLAN §3.3.');
         $this->reader = new FakeGmailMessageReader;
 
         $this->app->instance(GmailMessageReader::class, $this->reader);
@@ -47,13 +47,15 @@ class PollGmailIdempotencyAndCursorTest extends TestCase
         $connection = ConnectionModel::create([
             'user_id' => $user->id,
             'provider' => 'google',
-            'external_account_id' => 'sub-'.uniqid(),
+            'external_account_id' => 'sub-' . uniqid(),
             'email' => 'owner@example.com',
             'scopes' => ['gmail.readonly', 'gmail.send'],
             'status' => 'active',
         ]);
         $workflow = WorkflowModel::create([
-            'user_id' => $user->id, 'name' => 'wf', 'status' => WorkflowStatus::Active->value,
+            'user_id' => $user->id,
+            'name' => 'wf',
+            'status' => WorkflowStatus::Active->value,
         ]);
         $trigger = WorkflowTriggerModel::create([
             'workflow_id' => $workflow->id,
@@ -82,7 +84,7 @@ class PollGmailIdempotencyAndCursorTest extends TestCase
 
         return new GoogleGmailMessage([
             'id' => $id,
-            'threadId' => 'thread-'.$id,
+            'threadId' => 'thread-' . $id,
             'internalDate' => (string) $internalDateMs,
             'labelIds' => ['INBOX'],
             'snippet' => 'Snippet',
@@ -102,7 +104,7 @@ class PollGmailIdempotencyAndCursorTest extends TestCase
             'trigger_source' => 'poll',
             'trigger_payload' => ['message_id' => 'm1'],
             'workflow_snapshot' => [],
-            'idempotency_key' => 'gmail:'.$wf->id.':m1',
+            'idempotency_key' => 'gmail:' . $wf->id . ':m1',
         ]);
 
         $this->reader->listMessageIdsReturn = ['m1'];

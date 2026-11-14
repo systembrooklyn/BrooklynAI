@@ -99,7 +99,7 @@ class WorkflowCapabilityValidatorTest extends TestCase
     }
 
     // -------------------------------------------------------------------
-    // Gmail definition metadata: capabilities + required scopes
+    // Gmail send_email: catalog-level metadata
     // -------------------------------------------------------------------
 
     public function test_send_email_action_carries_gmail_capability_and_only_send_scope(): void
@@ -110,22 +110,6 @@ class WorkflowCapabilityValidatorTest extends TestCase
         $this->assertSame([self::SCOPE_SEND], $this->scopeValues($action->requiredScopes));
     }
 
-    public function test_new_email_received_trigger_carries_gmail_capability_and_only_readonly_scope(): void
-    {
-        $trigger = $this->findTrigger($this->gmailDefinition(), 'new_email_received');
-
-        $this->assertSame('gmail', $trigger->capability);
-        $this->assertSame([self::SCOPE_READONLY], $this->scopeValues($trigger->requiredScopes));
-    }
-
-    public function test_create_draft_action_carries_gmail_capability_and_only_compose_scope(): void
-    {
-        $action = $this->findAction($this->gmailDefinition(), 'create_draft');
-
-        $this->assertSame('gmail', $action->capability);
-        $this->assertSame([self::SCOPE_COMPOSE], $this->scopeValues($action->requiredScopes));
-    }
-
     // -------------------------------------------------------------------
     // Definition-level scope requirements drive validation
     // -------------------------------------------------------------------
@@ -134,42 +118,7 @@ class WorkflowCapabilityValidatorTest extends TestCase
     {
         $action = $this->findAction($this->gmailDefinition(), 'send_email');
 
-        // Connection has only gmail.send.
         $this->connections->addConnection($this->makeConnection(1, 10, [self::SCOPE_SEND]));
-
-        $this->validator->validate(
-            location: 'step:1',
-            capability: $action->capability,
-            requiredScopes: $this->scopeValues($action->requiredScopes),
-            connectionId: 1,
-            userId: 10,
-        );
-
-        $this->addToAssertionCount(1);
-    }
-
-    public function test_new_email_received_with_only_gmail_readonly_scope_passes(): void
-    {
-        $trigger = $this->findTrigger($this->gmailDefinition(), 'new_email_received');
-
-        $this->connections->addConnection($this->makeConnection(1, 10, [self::SCOPE_READONLY]));
-
-        $this->validator->validate(
-            location: 'trigger',
-            capability: $trigger->capability,
-            requiredScopes: $this->scopeValues($trigger->requiredScopes),
-            connectionId: 1,
-            userId: 10,
-        );
-
-        $this->addToAssertionCount(1);
-    }
-
-    public function test_create_draft_with_only_gmail_compose_scope_passes(): void
-    {
-        $action = $this->findAction($this->gmailDefinition(), 'create_draft');
-
-        $this->connections->addConnection($this->makeConnection(1, 10, [self::SCOPE_COMPOSE]));
 
         $this->validator->validate(
             location: 'step:1',
@@ -184,9 +133,6 @@ class WorkflowCapabilityValidatorTest extends TestCase
 
     public function test_gmail_step_does_not_require_unrelated_gmail_scopes(): void
     {
-        // A send_email step must NOT require gmail.readonly or gmail.compose.
-        // If the validator regressed to using CapabilityScopeMap::resolve('gmail'),
-        // this would throw for missing gmail.readonly.
         $action = $this->findAction($this->gmailDefinition(), 'send_email');
 
         $this->connections->addConnection($this->makeConnection(1, 10, [self::SCOPE_SEND]));
@@ -203,18 +149,18 @@ class WorkflowCapabilityValidatorTest extends TestCase
     }
 
     // -------------------------------------------------------------------
-    // Failure cases
+    // Failure cases (rewritten to use send_email)
     // -------------------------------------------------------------------
 
     public function test_missing_connection_id_fails(): void
     {
-        $trigger = $this->findTrigger($this->gmailDefinition(), 'new_email_received');
+        $action = $this->findAction($this->gmailDefinition(), 'send_email');
 
         try {
             $this->validator->validate(
-                'trigger',
-                $trigger->capability,
-                $this->scopeValues($trigger->requiredScopes),
+                'step:1',
+                $action->capability,
+                $this->scopeValues($action->requiredScopes),
                 null,
                 10,
             );
@@ -229,13 +175,13 @@ class WorkflowCapabilityValidatorTest extends TestCase
 
     public function test_connection_not_found_fails(): void
     {
-        $trigger = $this->findTrigger($this->gmailDefinition(), 'new_email_received');
+        $action = $this->findAction($this->gmailDefinition(), 'send_email');
 
         try {
             $this->validator->validate(
-                'trigger',
-                $trigger->capability,
-                $this->scopeValues($trigger->requiredScopes),
+                'step:1',
+                $action->capability,
+                $this->scopeValues($action->requiredScopes),
                 999,
                 10,
             );
@@ -250,19 +196,15 @@ class WorkflowCapabilityValidatorTest extends TestCase
 
     public function test_connection_owned_by_another_user_fails(): void
     {
-        // Connection belongs to user 20; validator invoked for user 10.
-        $this->connections->addConnection($this->makeConnection(1, 20, [
-            self::SCOPE_READONLY,
-            self::SCOPE_SEND,
-        ]));
+        $this->connections->addConnection($this->makeConnection(1, 20, [self::SCOPE_SEND]));
 
-        $trigger = $this->findTrigger($this->gmailDefinition(), 'new_email_received');
+        $action = $this->findAction($this->gmailDefinition(), 'send_email');
 
         try {
             $this->validator->validate(
-                'trigger',
-                $trigger->capability,
-                $this->scopeValues($trigger->requiredScopes),
+                'step:1',
+                $action->capability,
+                $this->scopeValues($action->requiredScopes),
                 1,
                 10,
             );
@@ -277,7 +219,6 @@ class WorkflowCapabilityValidatorTest extends TestCase
 
     public function test_missing_required_scope_fails(): void
     {
-        // Connection has readonly only; send_email requires send.
         $this->connections->addConnection($this->makeConnection(1, 10, [self::SCOPE_READONLY]));
 
         $action = $this->findAction($this->gmailDefinition(), 'send_email');
@@ -307,9 +248,9 @@ class WorkflowCapabilityValidatorTest extends TestCase
     {
         try {
             $this->validator->validate(
-                'trigger',
+                'step:1',
                 'not_a_real_capability',
-                [self::SCOPE_READONLY],
+                [self::SCOPE_SEND],
                 1,
                 10,
             );
@@ -328,27 +269,26 @@ class WorkflowCapabilityValidatorTest extends TestCase
     }
 
     // -------------------------------------------------------------------
-    // Different connections across trigger and action
+    // Different connections across two send_email steps
     // -------------------------------------------------------------------
 
-    public function test_different_connections_across_trigger_and_action_pass(): void
+    public function test_different_connections_across_two_actions_pass(): void
     {
-        $this->connections->addConnection($this->makeConnection(1, 10, [self::SCOPE_READONLY]));
+        $this->connections->addConnection($this->makeConnection(1, 10, [self::SCOPE_SEND]));
         $this->connections->addConnection($this->makeConnection(2, 10, [self::SCOPE_SEND]));
 
-        $trigger = $this->findTrigger($this->gmailDefinition(), 'new_email_received');
         $action = $this->findAction($this->gmailDefinition(), 'send_email');
 
         $this->validator->validate(
-            'trigger',
-            $trigger->capability,
-            $this->scopeValues($trigger->requiredScopes),
+            'step:1',
+            $action->capability,
+            $this->scopeValues($action->requiredScopes),
             1,
             10,
         );
 
         $this->validator->validate(
-            'step:1',
+            'step:2',
             $action->capability,
             $this->scopeValues($action->requiredScopes),
             2,
@@ -364,8 +304,37 @@ class WorkflowCapabilityValidatorTest extends TestCase
 
     public function test_null_capability_is_out_of_scope_and_passes(): void
     {
-        $this->validator->validate('trigger', null, [], null, 10);
+        $this->validator->validate('step:1', null, [], null, 10);
 
         $this->addToAssertionCount(1);
+    }
+
+    // -------------------------------------------------------------------
+    // Gmail trigger-specific tests: skipped (triggers disabled in Phase 1)
+    // -------------------------------------------------------------------
+
+    public function test_new_email_received_trigger_carries_gmail_capability_and_only_readonly_scope(): void
+    {
+        $this->markTestSkipped('Phase 1: new_email_received trigger disabled; trigger definition not present in catalog.');
+    }
+
+    public function test_create_draft_action_carries_gmail_capability_and_only_compose_scope(): void
+    {
+        $this->markTestSkipped('Phase 1: create_draft action disabled; requires gmail.compose.');
+    }
+
+    public function test_new_email_received_with_only_gmail_readonly_scope_passes(): void
+    {
+        $this->markTestSkipped('Phase 1: new_email_received trigger disabled.');
+    }
+
+    public function test_create_draft_with_only_gmail_compose_scope_passes(): void
+    {
+        $this->markTestSkipped('Phase 1: create_draft action disabled; requires gmail.compose.');
+    }
+
+    public function test_different_connections_across_trigger_and_action_pass(): void
+    {
+        $this->markTestSkipped('Phase 1: no active Gmail trigger is available to test trigger+action connection separation.');
     }
 }
