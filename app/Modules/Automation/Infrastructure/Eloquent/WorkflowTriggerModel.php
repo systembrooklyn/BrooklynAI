@@ -18,6 +18,7 @@ class WorkflowTriggerModel extends Model
         'interval_minutes',
         'poll_cursor',
         'next_poll_at',
+        'runtime_state',
     ];
 
     protected $casts = [
@@ -25,5 +26,6 @@ class WorkflowTriggerModel extends Model
         'interval_minutes' => 'integer',
         'poll_cursor' => 'integer',
         'next_poll_at' => 'datetime',
+        'runtime_state' => 'array',
     ];
 }

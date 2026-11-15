@@ -3,44 +3,42 @@
 namespace App\Modules\Execution\Infrastructure\Invokers;
 
 use App\Modules\Execution\Core\Contracts\ActionHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailAddLabelHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailArchiveHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailCreateDraftHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailCreateLabelHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailMarkAsReadHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailMarkAsUnreadHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailRemoveLabelHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailReplyToEmailHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailSendAttachmentLinksEmailHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveCopyFileHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveCreateFileHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveCreateFolderHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveDeleteFileHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveDownloadFileHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveExportWorkspaceFileHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveGetFileDetailsHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveListAccessibleFilesHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveMoveFileHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveRenameFileHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveSearchAccessibleFilesHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveShareFileHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveUpdateFileMetadataHandler;
+use App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveUploadFileHandler;
 use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailSendEmailHandler;
-use App\Modules\Execution\Infrastructure\Invokers\Handlers\GmailTrashHandler;
 
 final class HandlerRegistry
 {
-
-
     private const HANDLERS = [
         'google.gmail.send_email' => GmailSendEmailHandler::class,
 
-        // Phase 1: disabled (requires gmail.readonly via users.threads.get)
-        // 'google.gmail.reply_to_email' => GmailReplyToEmailHandler::class,
-
-        // Phase 1: disabled (requires gmail.compose)
-        // 'google.gmail.create_draft' => GmailCreateDraftHandler::class,
-
-        // Phase 1: disabled (requires gmail.modify)
-        // 'google.gmail.mark_as_read' => GmailMarkAsReadHandler::class,
-        // 'google.gmail.mark_as_unread' => GmailMarkAsUnreadHandler::class,
-        // 'google.gmail.archive' => GmailArchiveHandler::class,
-        // 'google.gmail.trash' => GmailTrashHandler::class,
-        // 'google.gmail.add_label' => GmailAddLabelHandler::class,
-        // 'google.gmail.remove_label' => GmailRemoveLabelHandler::class,
-
-        // Phase 1: disabled (requires gmail.labels)
-        // 'google.gmail.create_label' => GmailCreateLabelHandler::class,
-
-        // Phase 1: disabled (depends on disabled attachment trigger)
-        // 'google.gmail.send_attachment_links_email' => GmailSendAttachmentLinksEmailHandler::class,
+        // Phase 3: Google Drive actions
+        'google.drive.create_file' => DriveCreateFileHandler::class,
+        'google.drive.upload_file' => DriveUploadFileHandler::class,
+        'google.drive.get_file_details' => DriveGetFileDetailsHandler::class,
+        'google.drive.download_file' => DriveDownloadFileHandler::class,
+        'google.drive.update_file_metadata' => DriveUpdateFileMetadataHandler::class,
+        'google.drive.copy_file' => DriveCopyFileHandler::class,
+        'google.drive.move_file' => DriveMoveFileHandler::class,
+        'google.drive.rename_file' => DriveRenameFileHandler::class,
+        'google.drive.delete_file' => DriveDeleteFileHandler::class,
+        'google.drive.create_folder' => DriveCreateFolderHandler::class,
+        'google.drive.list_accessible_files' => DriveListAccessibleFilesHandler::class,
+        'google.drive.search_accessible_files' => DriveSearchAccessibleFilesHandler::class,
+        'google.drive.share_file' => DriveShareFileHandler::class,
+        'google.drive.export_workspace_file' => DriveExportWorkspaceFileHandler::class,
     ];
 
     /**

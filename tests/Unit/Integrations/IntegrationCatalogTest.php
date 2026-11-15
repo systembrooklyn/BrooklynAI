@@ -92,7 +92,7 @@ class IntegrationCatalogTest extends TestCase
         $gmail = $catalog->find('google.gmail');
 
         $this->assertNotNull($gmail);
-        $this->assertSame(['send_email'], array_map(static fn ($a) => $a->key, $gmail->actions));
+        $this->assertSame(['send_email'], array_map(static fn($a) => $a->key, $gmail->actions));
     }
 
     public function test_gmail_has_zero_triggers(): void
@@ -143,5 +143,57 @@ class IntegrationCatalogTest extends TestCase
                 );
             }
         };
+    }
+
+    public function test_drive_exposes_fourteen_actions_and_three_triggers(): void
+    {
+        $catalog = new IntegrationCatalog([new \App\Modules\Integrations\Infrastructure\Google\GoogleDriveIntegration]);
+        $drive = $catalog->require('google.drive');
+
+        $actionKeys = array_map(static fn($a) => $a->key, $drive->actions);
+        sort($actionKeys);
+
+        $this->assertCount(14, $actionKeys);
+        $this->assertSame([
+            'copy_file',
+            'create_file',
+            'create_folder',
+            'delete_file',
+            'download_file',
+            'export_workspace_file',
+            'get_file_details',
+            'list_accessible_files',
+            'move_file',
+            'rename_file',
+            'search_accessible_files',
+            'share_file',
+            'update_file_metadata',
+            'upload_file',
+        ], $actionKeys);
+
+        $triggerKeys = array_map(static fn($t) => $t->key, $drive->triggers);
+        sort($triggerKeys);
+        $this->assertSame(['file_created', 'file_removed_from_access', 'file_updated'], $triggerKeys);
+    }
+
+    public function test_all_drive_definitions_require_only_drive_file_scope(): void
+    {
+        $definition = (new \App\Modules\Integrations\Infrastructure\Google\GoogleDriveIntegration)->definition();
+        $expected = 'https://www.googleapis.com/auth/drive.file';
+
+        foreach ($definition->actions as $action) {
+            foreach ($action->requiredScopes as $scope) {
+                $this->assertSame($expected, $scope->value);
+            }
+            $this->assertSame('drive', $action->capability);
+        }
+
+        foreach ($definition->triggers as $trigger) {
+            foreach ($trigger->requiredScopes as $scope) {
+                $this->assertSame($expected, $scope->value);
+            }
+            $this->assertSame('drive', $trigger->capability);
+            $this->assertSame('poll', $trigger->strategy->value);
+        }
     }
 }

@@ -130,6 +130,7 @@ final class EloquentWorkflowRepository implements WorkflowRepository
         $model->interval_minutes = $trigger->intervalMinutes;
         $model->poll_cursor = $trigger->pollCursor;
         $model->next_poll_at = $trigger->nextPollAt;
+        $model->runtime_state = $trigger->runtimeState;
         $model->save();
 
         return $this->triggerToEntity($model->fresh());
@@ -247,6 +248,7 @@ final class EloquentWorkflowRepository implements WorkflowRepository
             updatedAt: $this->toImmutable($model->updated_at) ?? new DateTimeImmutable,
             pollCursor: $model->poll_cursor !== null ? (int) $model->poll_cursor : null,
             nextPollAt: $this->toImmutable($model->next_poll_at),
+            runtimeState: is_array($model->runtime_state) ? $model->runtime_state : null,
         );
     }
 
@@ -269,6 +271,7 @@ final class EloquentWorkflowRepository implements WorkflowRepository
     {
         return $value === null ? null : DateTimeImmutable::createFromInterface($value);
     }
+
     public function listAllActiveWithTriggerDue(DateTimeImmutable $now, int $limit = 50): array
     {
         return $this->hydrateActivePairs(

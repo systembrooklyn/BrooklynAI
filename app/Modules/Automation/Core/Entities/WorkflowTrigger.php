@@ -17,5 +17,6 @@ final class WorkflowTrigger
         public readonly \DateTimeImmutable $updatedAt,
         public readonly ?int $pollCursor = null,
         public readonly ?\DateTimeImmutable $nextPollAt = null,
+        public readonly ?array $runtimeState = null,
     ) {}
 }

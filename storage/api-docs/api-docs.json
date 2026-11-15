@@ -4485,6 +4485,144 @@
                 },
                 "type": "object"
             },
+            "DriveFile": {
+                "required": [
+                    "id",
+                    "name",
+                    "mime_type"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Google Drive integration for BrooklynAI.\n\nSCOPE: https://www.googleapis.com/auth/drive.file\n\nACCESS LIMITATION:\n  drive.file grants access ONLY to files created by BrooklynAI or\n  selected by the user via Google Picker. Actions here do NOT have\n  access to the user's entire Drive. List Accessible Files and\n  Search Accessible Files return only the app-visible subset.\n\nCATALOG SURFACE:\n  All 14 Drive actions and 3 Drive triggers are exposed through the\n  existing GET /api/catalog endpoint (see Catalog.php, operationId\n  \"catalog.show\"). This Swagger class documents Drive-specific schemas\n  and constraints; it does not add any new HTTP route.\n\n14 ACTIONS:\n  create_file, upload_file, get_file_details, download_file,\n  update_file_metadata, copy_file, move_file, rename_file,\n  delete_file, create_folder, list_accessible_files,\n  search_accessible_files, share_file, export_workspace_file\n\n3 TRIGGERS:\n  file_created, file_updated, file_removed_from_access\n\nTRIGGER STRATEGY:\n  All 3 triggers use TriggerStrategy::Poll (GoogleDriveChangePollStrategy)\n  with Drive Changes API v3 and durable page_token persistence in\n  workflow_triggers.runtime_state JSON.\n\nPICKER FLOW:\n  Web: Google Picker JS API with drive.file scope. Selected file IDs\n       are validated server-side via files.get before use.\n  Mobile/Desktop: OAuth redirect flow with trigger_onepick=true.\n       Only drive.file scope is permitted in this flow.\n\nLIMITATIONS:\n  - drive.file is per-file, not Drive-wide.\n  - \"File Removed from Access\" fires on deletion OR loss of access.\n  - export_workspace_file enforces a 10 MB limit (Drive API limit).\n  - share_file disallows type:anyone in Phase 3 (product restriction).\n  - download_file and export_workspace_file write to internal storage;\n    the storage_path output is not a public URL.",
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "mime_type": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "size": {
+                        "description": "Byte size as string (Drive API v3 convention)",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "web_view_link": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "parents": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "properties": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": true
+                    },
+                    "created_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "modified_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "DrivePermission": {
+                "required": [
+                    "permission_id",
+                    "type",
+                    "role"
+                ],
+                "properties": {
+                    "permission_id": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "user",
+                            "group",
+                            "domain"
+                        ]
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "reader",
+                            "commenter",
+                            "writer"
+                        ]
+                    },
+                    "email_address": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "domain": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "DriveDownloadOutput": {
+                "required": [
+                    "file_id",
+                    "storage_path",
+                    "size"
+                ],
+                "properties": {
+                    "file_id": {
+                        "type": "string"
+                    },
+                    "storage_path": {
+                        "description": "BrooklynAI internal storage path; pass to a subsequent Upload File step as storage_path config",
+                        "type": "string"
+                    },
+                    "size": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "DriveExportOutput": {
+                "required": [
+                    "file_id",
+                    "storage_path",
+                    "mime_type",
+                    "size"
+                ],
+                "properties": {
+                    "file_id": {
+                        "type": "string"
+                    },
+                    "storage_path": {
+                        "type": "string"
+                    },
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "size": {
+                        "description": "Must not exceed 10 MB (Google Drive export limit)",
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "GmailLabel": {
                 "required": [
                     "id",

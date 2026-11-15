@@ -169,12 +169,44 @@ class GoogleIntegrationsMetadataTest extends TestCase
         );
     }
 
-    public function test_drive_remains_metadata_only(): void
+    /**
+     * Phase 3: Drive now exposes 14 actions and 3 triggers.
+     */
+    public function test_drive_exposes_full_phase_3_catalog(): void
     {
         $drive = $this->catalog()->require('google.drive');
 
-        $this->assertSame([], $drive->actions);
-        $this->assertSame([], $drive->triggers);
+        $actionKeys = array_map(static fn($a) => $a->key, $drive->actions);
+        sort($actionKeys);
+
+        $this->assertSame(
+            [
+                'copy_file',
+                'create_file',
+                'create_folder',
+                'delete_file',
+                'download_file',
+                'export_workspace_file',
+                'get_file_details',
+                'list_accessible_files',
+                'move_file',
+                'rename_file',
+                'search_accessible_files',
+                'share_file',
+                'update_file_metadata',
+                'upload_file',
+            ],
+            $actionKeys
+        );
+
+        $triggerKeys = array_map(static fn($t) => $t->key, $drive->triggers);
+        sort($triggerKeys);
+
+        $this->assertSame(
+            ['file_created', 'file_removed_from_access', 'file_updated'],
+            $triggerKeys
+        );
+
         $this->assertNotSame('', trim($drive->description));
     }
 

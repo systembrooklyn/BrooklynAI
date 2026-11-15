@@ -102,4 +102,29 @@ class HandlerRegistryTest extends TestCase
         // Non-existent integration or action.
         $this->assertNull($registry->resolve('unknown.integration', 'x'));
     }
+    public function test_resolves_all_fourteen_drive_actions(): void
+{
+    $registry = new HandlerRegistry;
+
+    $expected = [
+        'create_file' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveCreateFileHandler::class,
+        'upload_file' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveUploadFileHandler::class,
+        'get_file_details' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveGetFileDetailsHandler::class,
+        'download_file' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveDownloadFileHandler::class,
+        'update_file_metadata' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveUpdateFileMetadataHandler::class,
+        'copy_file' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveCopyFileHandler::class,
+        'move_file' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveMoveFileHandler::class,
+        'rename_file' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveRenameFileHandler::class,
+        'delete_file' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveDeleteFileHandler::class,
+        'create_folder' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveCreateFolderHandler::class,
+        'list_accessible_files' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveListAccessibleFilesHandler::class,
+        'search_accessible_files' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveSearchAccessibleFilesHandler::class,
+        'share_file' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveShareFileHandler::class,
+        'export_workspace_file' => \App\Modules\Execution\Infrastructure\Invokers\Handlers\Drive\DriveExportWorkspaceFileHandler::class,
+    ];
+
+    foreach ($expected as $actionKey => $handlerClass) {
+        $this->assertSame($handlerClass, $registry->resolve('google.drive', $actionKey), "Failed for: {$actionKey}");
+    }
+}
 }

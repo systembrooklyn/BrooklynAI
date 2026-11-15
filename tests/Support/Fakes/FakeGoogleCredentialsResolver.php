@@ -7,10 +7,10 @@ use App\Modules\Connections\Core\ValueObjects\ResolvedGoogleCredentials;
 
 final class FakeGoogleCredentialsResolver implements GoogleCredentialsResolver
 {
-    public ?\Throwable $throws = null;
-
     /** @var array<int, array{userId: int, connectionId: ?int}> */
     public array $calls = [];
+
+    public ?\Throwable $throws = null;
 
     public function resolve(int $userId, ?int $connectionId = null): ResolvedGoogleCredentials
     {
@@ -21,8 +21,8 @@ final class FakeGoogleCredentialsResolver implements GoogleCredentialsResolver
         }
 
         return new ResolvedGoogleCredentials(
-            accessToken: 'test-access',
-            refreshToken: 'test-refresh',
+            accessToken: 'fake-access-token',
+            refreshToken: 'fake-refresh-token',
             expiresAt: null,
         );
     }
